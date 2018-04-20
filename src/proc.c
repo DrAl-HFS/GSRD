@@ -254,7 +254,7 @@ INLINE void procAXYDS
    }
 } // procAXYDS
 */
-void procB
+void procMD
 (
    Scalar * restrict pR,
    Scalar * restrict pS,
@@ -281,8 +281,8 @@ void procB
                copyin( pO[:1], pP[:1], pD[:2] )
 */
    acc_set_device_num( pDSMN->dev.n, pDSMN->dev.c );
-   #pragma acc parallel async( pDSMN->dev.n )
    #pragma acc data update( pR[:pO->n] , pS[:pO->n] ) present_or_copyin( pO[:1], pP[:1], pD[:2] ) 
+   #pragma acc parallel async( pDSMN->dev.n )
    {
       //pragma acc parallel loop
       for (U32 i= 0; i < 2; ++i )
@@ -298,7 +298,7 @@ void procB
          }
       }
    }
-} // procB
+} // procMD
 
 U32 hackMD
 (
@@ -383,12 +383,12 @@ U32 hackMD
             //pragma omp parallel for
             for (U32 j= 0; j < nD; ++j)
             {
-               procB(pTR, pSR, pO, &(pP->base), aD+j);
+               procMD(pTR, pSR, pO, &(pP->base), aD+j);
             }
             //pragma omp parallel for
             for (U32 j= 0; j < nD; ++j)
             {
-               procB(pSR, pTR, pO, &(pP->base), aD+i);
+               procMD(pSR, pTR, pO, &(pP->base), aD+i);
             }
          }
          return(2 * nI);
