@@ -21,9 +21,9 @@ endif
 
 # Check compiler & fall back to standard LINUX tools if necessary
 CCOUT := $(shell $(CC) 2>&1)
-
+# Still unable to capture output...
+# ... so catch-all disnae work ...
 ifeq ($(findstring "not found", $(CCOUT)), "not found")
-# Catch-all disnae work...
 CC       = gcc
 CCFLAGS  = -std=c11 -W
 ACCFLAGS = -DACC -fopenacc
@@ -39,6 +39,7 @@ endif
 all: build run verify
 
 build: acctst.c
+	$(info CCOUT=$(CCOUT)) @echo $(CCOUT)
 	$(CC) $(CCFLAGS) $(ACCFLAGS) -o $(TARGET) $<
 
 run: $(TARGET)

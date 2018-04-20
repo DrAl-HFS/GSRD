@@ -264,6 +264,7 @@ void procB
 )
 {
    const DomSub * pD= pDSMN->d;
+/*
    const size_t i0a= pD[0].in.o, i0n= pD[0].in.n;
    const size_t i0b= i0a + pO->stride[2];
    const size_t i1a= pD[1].in.o, i1n= pD[1].in.n;
@@ -274,14 +275,14 @@ void procB
    const size_t o1a= pD[1].upd.o, o1n= pD[1].upd.n;
    const size_t o1b= i1a + pO->stride[2];
 
-   acc_set_device_num( pDSMN->dev.n, pDSMN->dev.c );
-   /*pragma acc data present_or_create( pTR[ i0a:i0n ], pTR[ i1a:i1n ], pTR[ i0b:i0n ], pTR[ i1b:i1n ] ) \
+   pragma acc data present_or_create( pTR[ i0a:i0n ], pTR[ i1a:i1n ], pTR[ i0b:i0n ], pTR[ i1b:i1n ] ) \
                copyin( pSR[ i0a:i0n ], pSR[ i1a:i1n ], pSR[ i0b:i0n ], pSR[ i1b:i1n ] ) \
                copyout( pTR[ o0a:o0n ], pTR[ o1a:o1n ], pTR[ o0b:o0n ], pTR[ o1b:o1n ] ) \
                copyin( pO[:1], pP[:1], pD[:2] )
 */
-   #pragma acc data present_or_create( pR[:pO->n] ) copy( pS[:pO->n] ) present_or_copyin( pO[:1], pP[:1], pD[:2] ) 
+   acc_set_device_num( pDSMN->dev.n, pDSMN->dev.c );
    #pragma acc parallel async( pDSMN->dev.n )
+   #pragma acc data update( pR[:pO->n] , pS[:pO->n] ) present_or_copyin( pO[:1], pP[:1], pD[:2] ) 
    {
       //pragma acc parallel loop
       for (U32 i= 0; i < 2; ++i )
