@@ -9,7 +9,8 @@ ABFLAGS = -DACC
 # -Mlarge_arrays # >2GB
 # Whereas INKCAP (GTX970M - "cc50") works with default...
 #ACCFLAGS = -mp -fast -acc=verystrict -ta=multicore,tesla
-ACCFLAGS = -fast -acc=verystrict -ta=multicore,tesla
+#ACCFLAGS = -fast -acc=verystrict -ta=multicore,tesla
+ACCFLAGS = -g -Mautoinline -acc=verystrict -ta=multicore,tesla
 #FAST = -O4 -Mautoinline -acc=verystrict
 #OPT = -ta=tesla:managed #ERR: malloc: call to cuMemAllocManaged returned error 3: Not initialized
 

@@ -10,7 +10,7 @@ from PIL import Image
 # from matplotlib import pyplot
 # from gsrdutil import saveImage, saveBuff
 
-G_IMG_LEN= 512
+G_IMG_LEN= 1024
 gImgDef= (G_IMG_LEN, G_IMG_LEN)
 gImgDefRGB= (G_IMG_LEN, G_IMG_LEN, 3)
 

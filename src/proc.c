@@ -47,9 +47,13 @@ typedef struct
 
 typedef struct
 {
+   int n, t;
+} MapDev;
+
+typedef struct
+{
    DomSub  d[2];
-   AccDev   dev;
-   U8 pad[2];
+   MapDev  dev;
 } DSMapNode;
 
 // typedef struct { V2U32 min, max; } DomSub2D;
@@ -280,8 +284,10 @@ void procMD
                copyout( pTR[ o0a:o0n ], pTR[ o1a:o1n ], pTR[ o0b:o0n ], pTR[ o1b:o1n ] ) \
                copyin( pO[:1], pP[:1], pD[:2] )
 */
-   acc_set_device_num( pDSMN->dev.n, pDSMN->dev.c );
-   #pragma acc data update( pR[:pO->n] , pS[:pO->n] ) present_or_copyin( pO[:1], pP[:1], pD[:2] ) 
+   //acc_set_device_num ( pDSMN->dev.n, pDSMN->dev.c );
+   const int n= pDSMN->dev.n, t= pDSMN->dev.t;
+   #pragma acc set device_num(n) device_type(t)
+   #pragma acc data copy( pR[:pO->n] , pS[:pO->n] ) present_or_copyin( pO[:1], pP[:1], pD[:2] ) 
    #pragma acc parallel async( pDSMN->dev.n )
    {
       //pragma acc parallel loop
@@ -318,7 +324,8 @@ U32 hackMD
       if (gDev.iHost < gDev.nDev)
       {
          U32 se= 7;
-         aD[nD].dev= gDev.d[gDev.iHost];
+         aD[nD].dev.n= gDev.d[gDev.iHost].n;
+         aD[nD].dev.t= gDev.d[gDev.iHost].c;
          pD= aD[nD].d;
 
          pD->mm.min= 0;
@@ -341,7 +348,8 @@ U32 hackMD
          U32 iNH= 0;
          iNH+= (0 == gDev.iHost);
 
-         aD[nD].dev= gDev.d[iNH];
+         aD[nD].dev.n= gDev.d[iNH].n;
+         aD[nD].dev.t= gDev.d[iNH].c;
          pD= aD[nD].d;
 
          pD[0].mm.min= o;
@@ -370,7 +378,7 @@ U32 hackMD
             aD[j].d[i].upd.n*= pO->stride[1];
          }
 
-         printf("[%u] %u:%u\n", j, aD[j].dev.c, aD[j].dev.n); pD= aD[j].d; // dump
+         printf("[%u] %u:%u\n", j, aD[j].dev.t, aD[j].dev.n); pD= aD[j].d; // dump
          printf("   mm \t%u,%u; %u,%u\n", pD[0].mm.min, pD[0].mm.max, pD[1].mm.min, pD[1].mm.max);
          printf("   in \t%u,%u; %u,%u\n", pD[0].in.o, pD[0].in.n, pD[1].in.o, pD[1].in.n);
          printf("   out\t%u,%u; %u,%u\n", pD[0].out.o, pD[0].out.n, pD[1].out.o, pD[1].out.n);
