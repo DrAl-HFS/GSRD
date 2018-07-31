@@ -54,73 +54,68 @@ void vAdd (Scalar * restrict pR, const Scalar * const pV1, const Scalar * const 
    for (size_t i= 0; i < n; ++i ) { pR[i]= pV1[i] + pV2[i]; }
 } // vAdd
 
-void vSetLin (Scalar * restrict pR, const size_t n, const Scalar lm[2])
+void vSetLin (Scalar * restrict pR, const size_t n, const Scalar lm[2], int queue)
 {
+#pragma acc parallel loop present(pR,lm) async(queue)
    for (size_t i= 0; i < n; ++i ) { pR[i]= i * lm[1] + lm[0]; }
 } // vSetLin
 
 void vLinComb (Scalar * restrict pR, const Scalar * const pV1, const Scalar * const pV2, const size_t n, const Scalar k[2])
 {
-   //pragma acc data present( pR[:n], pV1[:n], pV2[:n], k[:2] )
+   #pragma acc parallel loop present( pR, pV1, pV2, k ) async
    for (size_t i= 0; i < n; ++i ) { pR[i]= pV1[i] * k[0] + pV2[i] * k[1]; }
 } // vLinComb
 
-#pragma acc routine(vSetLin) vector
-#pragma acc routine(vLinComb) vector
 
 void proc (Scalar * restrict pV0, Scalar * restrict pV1, Scalar * restrict pV2, Scalar * restrict pV3, size_t n)
 {
    SMVal dt[8]={-1,};
+   int dev0 = 0;
+   int dev1 = 1;
 
    printf("proc()\n");
-   #pragma acc set device_num(0) device_type(acc_device_host)
+   #pragma acc set device_num(dev0) device_type(acc_device_nvidia)
    dt[0]= deltaT();
 
    const Scalar lm1[2]={0.5*n,-0.5}, lm2[2]={-0.5*n,0.5}, k[2]= {0.25, 0.25};
    #pragma acc data create( pV1[:n], pV2[:n] ) copyin( lm1[:2], lm2[:2] ) copyout( pV1[:n], pV2[:n] )
    {
-      #pragma acc parallel
-      {
-         vSetLin(pV1, n, lm1);
-         vSetLin(pV2, n, lm2);
-      }
+      vSetLin(pV1, n, lm1, 1);
+      vSetLin(pV2, n, lm2, 2);
+      #pragma acc wait
    }
    dt[0]= deltaT();
    printf("\tdt: %G\n", dt[0]);
 
-   #pragma acc set device_num(0) device_type(acc_device_nvidia)
+   #pragma acc set device_num(dev1) device_type(acc_device_nvidia)
    #pragma acc enter data create( pV0[:n] ) copyin( pV1[:n], pV2[:n], k[:2] )
 
-   #pragma acc parallel async
    vLinComb(pV0, pV1, pV2, n, k);
 
    dt[1]= deltaT();
    printf("\tdt: %G %G\n", dt[0], dt[1]);
 
-   #pragma acc set device_num(0) device_type(acc_device_host)
+   #pragma acc set device_num(dev0) device_type(acc_device_nvidia)
    #pragma acc enter data create( pV3[:n] ) copyin( pV1[:n], pV2[:n], k[:2] )
 
-   #pragma acc parallel async
    vLinComb(pV3, pV1, pV2, n, k);
 
    dt[2]= deltaT();
    printf("\tdt: %G %G %G\n", dt[0], dt[1], dt[2]);
 
 
-   #pragma acc set device_num(0) device_type(acc_device_nvidia)
+   #pragma acc set device_num(dev1) device_type(acc_device_nvidia)
    #pragma acc wait
    dt[3]= deltaT();
    printf("\tdt: %G %G %G %G\n", dt[0], dt[1], dt[2], dt[3]);
-   #pragma acc update self( pV0[:n] ) async  // data copyout( pV0[:n] )
+   #pragma acc update self( pV0[:n] ) 
 
-   #pragma acc set device_num(0) device_type(acc_device_host)
+   #pragma acc set device_num(dev0) device_type(acc_device_nvidia)
    #pragma acc wait
    dt[4]= deltaT();
    printf("\tdt: %G %G %G %G %G\n", dt[0], dt[1], dt[2], dt[3], dt[4]);
-   #pragma acc update self( pV3[:n] ) async  // data copyout( pV3[:n] )
+   #pragma acc update self( pV3[:n] ) 
    
-   #pragma acc wait_all
-
    dt[5]= deltaT();
    printf("\tdt: %G %G %G %G %G %G\n", dt[0], dt[1], dt[2], dt[3], dt[4], dt[5]);
    {
@@ -129,10 +124,10 @@ void proc (Scalar * restrict pV0, Scalar * restrict pV1, Scalar * restrict pV2, 
       printf("\ts: %G %G %G %G\n", s[0], s[1], s[2], s[3]);
    }
 
-   #pragma acc set device_num(0) device_type(acc_device_nvidia)
+   #pragma acc set device_num(dev1) device_type(acc_device_nvidia)
    #pragma acc exit data delete( pV0[:n], pV1[:n], pV2[:n], k[:2] )
 
-   #pragma acc set device_num(0) device_type(acc_device_host)
+   #pragma acc set device_num(dev0) device_type(acc_device_nvidia)
    #pragma acc exit data delete( pV3[:n], pV1[:n], pV2[:n], k[:2] )
 } // proc
 
