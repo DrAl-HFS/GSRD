@@ -333,12 +333,37 @@ size_t test1 (const DataContext * const pDC, SMVal tE[4], const Scalar w[3], siz
    return(2 * i);
 } // test1
 
+size_t report1 (const DataContext * const pDC, SMVal tE[4], const size_t iter)
+{
+   static const char * const m[2]= { "PASS", "FAIL" };
+   Analysis a= {0,};
+   size_t sumErr=0;
+
+   printf("timerEpsilon= %G\n", tE[0]);
+   printf("\ttE= %G, %G, %G\n", tE[1], tE[2], tE[3]);
+
+   printf("---\n%zu iterations on %zu elements:\n", iter, pDC->n);
+   printf("Primary buffers: R1 vs. E1\n");
+   sumErr= analyse(&a, pDC->pR1, pDC->pE1, pDC->n, 50, 1E-30);
+   printf("\tConservation: %G, %G\n", a.c[0].m[1], a.c[1].m[1]);
+   printf("\t%zu discrepancies (M1=%G, M2=%G)\n", a.d.nD, a.d.s.m[1], a.d.s.m[2] );
+   printf("\t%zu ErrLoc; %s\n", a.d.nEL, m[sumErr>0] );
+   if (sumErr > 0)
+   {
+      printf("\tNeg: R=%zu E=%zu, Exc: %zu\n", a.d.nNR, a.d.nNE, a.d.nXER);
+   }
+   printf("Secondary buffers R2 vs. E2\n");
+   size_t aux= analyse(&a, pDC->pR2, pDC->pE2, pDC->n, 5, 1E-30);
+   printf("\t%zu discrepancies ([2]->%zu)\n", a.d.nD, aux);
+
+   return(sumErr);
+} // report1
+
 int main( int argc, char* argv[] )
 {
-   size_t iter, n, sumErr=0;
+   size_t iter, n;
    DataContext dc= {NULL, };
-   //Scalar *pR, *pV1, *pV2, *pE;
-   Analysis a= {0,};
+   int r= -1;
 
    if( argc > 1 ) { n= atoi( argv[1] ); }
    if ( n <= 0 ) { n= 1<<16; }
@@ -355,28 +380,10 @@ int main( int argc, char* argv[] )
 
       iter= test1(&dc, tE, w, iter);
 
-      n= saveBuff(dc.pR1, "R1F64.dat", dc.n * sizeof(*(dc.pR1)));
-      printf("\tfile %zu bytes\n", n);
-      printf("timerEpsilon= %G\n", tE[0]);
-      printf("\ttE= %G, %G, %G\n", tE[1], tE[2], tE[3]);
-   }
-
-   {
-      static const char * const m[2]= { "PASS", "FAIL" };
-      printf("---\n%zu iterations on %zu elements:\n", iter, dc.n);
-      printf("Primary buffers: R1 vs. E1\n");
-      sumErr= analyse(&a, dc.pR1, dc.pE1, dc.n, 50, 1E-30);
-      printf("\tConservation: %G, %G\n", a.c[0].m[1], a.c[1].m[1]);
-      printf("\t%zu discrepancies (M1=%G, M2=%G)\n", a.d.nD, a.d.s.m[1], a.d.s.m[2] );
-      printf("\t%zu ErrLoc; %s\n", a.d.nEL, m[sumErr>0] );
-      if (sumErr > 0)
-      {
-         printf("\tNeg: R=%zu E=%zu, Exc: %zu\n", a.d.nNR, a.d.nNE, a.d.nXER);
-      }
-      printf("Secondary buffers R2 vs. E2\n");
-      size_t aux= analyse(&a, dc.pR2, dc.pE2, dc.n, 5, 1E-30);
-      printf("\t%zu discrepancies ([2]->%zu)\n", a.d.nD, aux);
+      n= saveBuff(dc.pR1, "R1F64.dat", dc.n * sizeof(*(dc.pR1))); printf("\tfile %zu bytes\n", n);
+      n= report1(&dc, tE, iter);
+      r= -(n > 0);
    }
    release(&dc);
-   return(-(sumErr > 0));
+   return(r);
 } // main
