@@ -96,8 +96,11 @@ static void addDevType (AccDevTable *pT, const U8 c, const U8 nC)
 
 /*** Application (model) routines ***/
 
-// Stride 0..3 -> +-X +-Y
-//#pragma acc routine vector
+// Compute a symmetric 9-point discrete Laplacian operator on a 2D scalar field using
+// four stride offsets to deal with boundary conditions.
+// pS gives the address of the scalar value at the centre of the operator kernel
+// Strides s[0..3] -> +-X +-Y
+// Weights k[0..2] centre, horizontal&vertical, diagonal
 INLINE Scalar laplace2D4S9P (const Scalar * const pS, const Stride s[4], const Scalar k[3])
 {
    return( pS[0] * k[0] +
@@ -105,7 +108,14 @@ INLINE Scalar laplace2D4S9P (const Scalar * const pS, const Stride s[4], const S
            (pS[ s[0]+s[2] ] + pS[ s[0]+s[3] ] + pS[ s[1]+s[2] ] + pS[ s[1]+s[3] ]) * k[2] ); 
 } // laplace2D4S9P
 
-//#pragma acc routine vector
+// Compute a single point Grey-Scott update based on the preceding Laplacian operator applied to
+// each of the reagent scalar fields A & B. Double-buffering of scalar fields is used to prevent
+// temporal feed-back error while maintaining relatively straightforward parallelisability.
+// pR and pS respectively give the result and source scalar field pairs
+// i is the index of the element to be updated
+// j is the stride between reagents within a scalar field pair
+// wrap[] is used as described in the Laplacian operator
+// pP gives the coefficients describing diffusion and reaction rates (unparameterised in this instance)
 INLINE void proc1 (Scalar * const pR, const Scalar * const pS, const Index i, const Stride j, const Stride wrap[4], const BaseParamVal * const pP)
 {
    const Scalar * const pA= pS+i, a= *pA;
@@ -116,7 +126,8 @@ INLINE void proc1 (Scalar * const pR, const Scalar * const pS, const Index i, co
    pR[i+j]= b + laplace2D4S9P(pB, wrap, pP->kL.b) + rab2 - pP->kDB * b;
 } // proc1
 
-//#pragma acc routine vector
+// Wrapper function for proc1() that determines wrap values for the local spatial indices.
+// This automates boundary processing.
 INLINE void proc1XY (Scalar * const pR, const Scalar * const pS, const Index x, const Index y, const ImgOrg *pO, const BaseParamVal * const pP)
 {
    Stride wrap[4];
@@ -129,7 +140,24 @@ INLINE void proc1XY (Scalar * const pR, const Scalar * const pS, const Index x, 
    proc1(pR, pS, x * pO->stride[0] + y * pO->stride[1], pO->stride[3], wrap, pP);
 } // proc1XY
 
-// Simple parameters, avoids most unnecessary boundary checking
+// Single GS iteration over field/image using brute force boundary check for every site
+void procAXY (Scalar * restrict pR, const Scalar * restrict pS, const ImgOrg * pO, const BaseParamVal * pP)
+{
+   #pragma acc data present( pR[:pO->n], pS[:pO->n], pO[:1], pP[:1] )
+   {
+      #pragma acc parallel loop
+      for (U32 y= 0; y < pO->def.y; ++y )
+      {
+         #pragma acc loop vector
+         for (U32 x= 0; x < pO->def.x; ++x )
+         {
+            proc1XY(pR, pS, x, y, pO, pP);
+         }
+      }
+   }
+} // procAXY
+
+// Single GS iteration over field/image, avoiding most boundary checking
 void procA (Scalar * restrict pR, const Scalar * restrict pS, const ImgOrg * pO, const BaseParamVal * pP)
 {
    #pragma acc data present( pR[:pO->n], pS[:pO->n], pO[:1], pP[:1] )
@@ -173,6 +201,7 @@ void procA (Scalar * restrict pR, const Scalar * restrict pS, const ImgOrg * pO,
    } // ... acc data ..
 } // procA
 
+// Multiple GS iterations of even number - minimises buffer copying
 U32 proc2IA
 (
    Scalar * restrict pTR, // temp "result" (unused if acc. device has sufficient private memory)
@@ -194,6 +223,7 @@ U32 proc2IA
    return(2*nI);
 } // proc2IA
 
+// Multiple GS iterations of odd number - minimises buffer copying
 U32 proc2I1A (Scalar * restrict pR, Scalar * restrict pS, const ImgOrg * pO, const ParamVal * pP, const U32 nI)
 {
    #pragma acc data present_or_create( pR[:pO->n] ) copyin( pS[:pO->n] ) copyout( pR[:pO->n] ) \
@@ -209,23 +239,6 @@ U32 proc2I1A (Scalar * restrict pR, Scalar * restrict pS, const ImgOrg * pO, con
    return(2*nI+1);
 } // proc2I1A
 
-
-// Simple brute force implementation (every site boundary checked)
-void procAXY (Scalar * restrict pR, const Scalar * restrict pS, const ImgOrg * pO, const BaseParamVal * pP)
-{
-   #pragma acc data present( pR[:pO->n], pS[:pO->n], pO[:1], pP[:1] )
-   {
-      #pragma acc parallel loop
-      for (U32 y= 0; y < pO->def.y; ++y )
-      {
-         #pragma acc loop vector
-         for (U32 x= 0; x < pO->def.x; ++x )
-         {
-            proc1XY(pR, pS, x, y, pO, pP);
-         }
-      }
-   }
-} // procAXY
 
 
 /*** multi-device testing ***/
@@ -287,7 +300,7 @@ void procMD
    //acc_set_device_num ( pDSMN->dev.n, pDSMN->dev.c );
    const int n= pDSMN->dev.n, t= pDSMN->dev.t;
    #pragma acc set device_num(n) device_type(t)
-   #pragma acc data copy( pR[:pO->n] , pS[:pO->n] ) present_or_copyin( pO[:1], pP[:1], pD[:2] ) 
+   #pragma acc data copy( pR[:pO->n] , pS[:pO->n] ) copyin( pO[:1], pP[:1], pD[:2] )
    #pragma acc parallel async( pDSMN->dev.n )
    {
       //pragma acc parallel loop
@@ -478,21 +491,21 @@ const char *procGetCurrAccTxt (char t[], int m)
 {
    const AccDev * const pA= gDev.d + gDev.iCurr;
    const char *s="C";
-#ifdef OPEN_ACC
+#ifdef ACC
    switch (pA->c)
    {
       case acc_device_nvidia : s= "NV"; break;
       case acc_device_host :   s= "H"; break;
       default : s= "?"; break;
    }
-#endif // OPEN_ACC
+#endif // ACC
    snprintf(t, m, "%s%u", s, pA->n);
    return(t);
 } // procGetCurrAccTxt
 
 Bool32 procSetNextAcc (Bool32 wrap)
 {
-#ifdef OPEN_ACC
+#ifdef ACC
    if (gDev.nDev > 0)
    {
       U8 iN= gDev.iCurr + 1;
@@ -504,11 +517,12 @@ Bool32 procSetNextAcc (Bool32 wrap)
          return(TRUE);
       }
    }
-#endif // OPEN_ACC
+#endif // ACC
    return(FALSE);
 } // procSetNextAcc
 
-
+// Perform arbitray number of GS iterations, selecting odd or even
+// buffer handling (minimisation of copying) as appropriate
 U32 procNI
 (
    Scalar * restrict pR,
@@ -521,9 +535,10 @@ U32 procNI
    if (nI & 1) return proc2I1A(pR, pS, pO, pP, nI>>1);
    else
    {
-      U32 n= hackMD(pR, pS, pO, pP, nI>>1);
+      /*U32 n= hackMD(pR, pS, pO, pP, nI>>1);
       if (0 == n) { n= proc2IA(pR, pS, pO, pP, nI>>1); }
-      return(n);
+      return(n);*/
+      return proc2IA(pR, pS, pO, pP, nI>>1);
    }
 } // procNI
 
