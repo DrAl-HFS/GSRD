@@ -84,6 +84,7 @@ void diffuse (Scalar * restrict pR, const Scalar * const pS, const size_t n, con
    for (size_t i= 1; i < m; ++i ) { pR[i]= w[0] * pS[i-1] + w[1] * pS[i] + w[2] * pS[i+1]; }
 } // diffuse
 
+// Defective version for memory
 void diffuseAG (Scalar * restrict pR, const Scalar * const pS, const size_t n, const Scalar w[3])
 {
 // implicit copyin(w[:3],pS[-1:n+2]) copyout(pR[:n]) => GHOST WRAP, WRONG!
@@ -91,6 +92,7 @@ void diffuseAG (Scalar * restrict pR, const Scalar * const pS, const size_t n, c
    for (size_t i= 0; i < n; ++i ) { pR[i]= w[0] * pS[i-1] + w[1] * pS[i] + w[2] * pS[i+1]; }
 } // diffuseAG
 
+// Single iteration of diffusion with ACC directives
 INLINE void diffuseA (Scalar * restrict pR, const Scalar * const pS, const size_t n, const Scalar w[3])
 {
    #pragma acc data present( pR[:n], pS[:n], w[3] )
@@ -106,6 +108,7 @@ INLINE void diffuseA (Scalar * restrict pR, const Scalar * const pS, const size_
    }
 } // diffuseA
 
+// Single iteration wrapper with buffer copy ACC directives
 void diffuse1A (Scalar * restrict pR, const Scalar * const pS, const size_t n, const Scalar w[3])
 {
    #pragma acc data present_or_create( pR[:n] ) present_or_copyin( pS[:n], w[3] )
@@ -114,6 +117,7 @@ void diffuse1A (Scalar * restrict pR, const Scalar * const pS, const size_t n, c
    { pR[0]= pR[0]; } // gcc -fopenacc compatibility
 } // diffuse1A
 
+// Even numbered multi-iteration diffusion
 size_t diffuse2IA (const size_t nI, Scalar * restrict pTR, Scalar * restrict pSR, const size_t n, const Scalar w[3])
 {
    #pragma acc data present_or_create( pTR[:n] ) copy( pSR[:n] ) present_or_copyin( w[:3] )
@@ -128,6 +132,7 @@ size_t diffuse2IA (const size_t nI, Scalar * restrict pTR, Scalar * restrict pSR
    return(2*nI);
 } // diffuse2IA
 
+// Odd numbered multi-iteration diffusion
 size_t diffuse2I1A (const size_t nI, Scalar * restrict pR, Scalar * restrict pS, const size_t n, const Scalar w[3])
 {
    #pragma acc data present_or_create( pR[:n] ) copyin( pS[:n] ) present_or_copyin( w[:3] )
@@ -284,9 +289,53 @@ int init (DataContext * const pDC, const size_t n)
    return(0);
 } // init
 
+size_t test1 (const DataContext * const pDC, SMVal tE[4], const Scalar w[3], size_t iter)
+{
+   size_t i= 0;
+
+   // Set initial state & warm-up algorithmic data flow
+   diffuse(pDC->pE1, pDC->pI, pDC->n, w);
+   diffuse1A(pDC->pR1, pDC->pI, pDC->n, w);
+
+   // Start timing
+   tE[0]= deltaT(); tE[0]= deltaT();
+   for ( i= 0; i < iter; ++i )
+   {  // Unaccelerated
+      diffuse(pDC->pE2, pDC->pE1, pDC->n, w);
+      diffuse(pDC->pE1, pDC->pE2, pDC->n, w);
+   }
+   tE[1]= deltaT();
+
+   for ( i= 0; i < iter; ++i )
+   {  // Accelerated but with potential for unnecessary buffer copies
+      diffuse1A(pDC->pR2, pDC->pR1, pDC->n, w);
+      diffuse1A(pDC->pR1, pDC->pR2, pDC->n, w);
+   }
+   tE[2]= deltaT();
+
+   // Optimally accelerated version:
+#if 0
+   // R2 buffer should unchanged if GPU copy works as expected
+   vSet(pDC->pR2, pDC->n, -4E9); 
+   // Reset R1 to initial state for meaningful numerical comparison
+   diffuse1A(pDC->pR1, pDC->pI, pDC->n, w);
+
+   tE[3]= deltaT();
+   diffuse2IA(iter, pDC->pR2, pDC->pR1, pDC->n, w);
+   tE[3]= deltaT();
+#else
+   vCopy(pDC->pR2, pDC->n, pDC->pI);
+   tE[3]= deltaT();
+   diffuse2I1A(iter, pDC->pR1, pDC->pR2, pDC->n, w);
+   tE[3]= deltaT();
+#endif
+   
+   return(2 * i);
+} // test1
+
 int main( int argc, char* argv[] )
 {
-   size_t iter, i, n, sumErr=0;
+   size_t iter, n, sumErr=0;
    DataContext dc= {NULL, };
    //Scalar *pR, *pV1, *pV2, *pE;
    Analysis a= {0,};
@@ -300,51 +349,16 @@ int main( int argc, char* argv[] )
    {
       SMVal tE[4];
       const Scalar w[3]={ 0.25, 0.5, 0.25 }; // 1D isotropic diffusion weights
+
       // w[1]= 1.0 - (w[0] + w[2]);
       iter= n / 8;
 
-      // Set initial state & warm-up algorithmic data flow
-      diffuse(dc.pE1, dc.pI, dc.n, w);
-      diffuse1A(dc.pR1, dc.pI, dc.n, w);
+      iter= test1(&dc, tE, w, iter);
 
-      // Start timing
-      tE[0]= deltaT(); tE[0]= deltaT();
-      for ( i= 0; i < iter; ++i )
-      {  // Unaccelerated
-         diffuse(dc.pE2, dc.pE1, dc.n, w);
-         diffuse(dc.pE1, dc.pE2, dc.n, w);
-      }
-      tE[1]= deltaT();
-
-      for ( i= 0; i < iter; ++i )
-      {  // Accelerated but with potential for unnecessary buffer copies
-         diffuse1A(dc.pR2, dc.pR1, dc.n, w);
-         diffuse1A(dc.pR1, dc.pR2, dc.n, w);
-      }
-      tE[2]= deltaT();
-
-      // Optimally accelerated version:
-#if 0
-      // R2 buffer should unchanged if GPU copy works as expected
-      vSet(dc.pR2, dc.n, -4E9); 
-      // Reset R1 to initial state for meaningful numerical comparison
-      diffuse1A(dc.pR1, dc.pI, dc.n, w);
-
-      tE[3]= deltaT();
-      diffuse2IA(iter, dc.pR2, dc.pR1, dc.n, w);
-      tE[3]= deltaT();
-#else
-      vCopy(dc.pR2, dc.n, dc.pI);
-      tE[3]= deltaT();
-      diffuse2I1A(iter, dc.pR1, dc.pR2, dc.n, w);
-      tE[3]= deltaT();
-#endif
       n= saveBuff(dc.pR1, "R1F64.dat", dc.n * sizeof(*(dc.pR1)));
       printf("\tfile %zu bytes\n", n);
       printf("timerEpsilon= %G\n", tE[0]);
       printf("\ttE= %G, %G, %G\n", tE[1], tE[2], tE[3]);
-      
-      iter= 2 * i;
    }
 
    {
