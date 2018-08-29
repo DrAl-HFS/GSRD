@@ -110,6 +110,8 @@ extern size_t saveBuff (const void * const pB, const char * const path, const si
 extern SMVal deltaT (void);
 extern U32 statGetRes1 (StatRes1 * const pR, const StatMom * const pS, const SMVal dof);
 
+extern int scanEnvID (int v[], int max, const char *id);
+
 // extern const char *sc (const char *s, const char c, const char * const e, const I8 o);
 //extern int scanVI (int v[], const int vMax, ScanSeg * const pSS, const char s[]);
 extern int scanArgs (ArgInfo * pAI, const char * const a[], int nA);

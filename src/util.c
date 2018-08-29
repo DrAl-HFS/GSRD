@@ -200,6 +200,30 @@ size_t scanDFI (DataFileInfo * pDFI, const char * const path)
    return(bytes);
 } // scanDFI
 
+int scanEnvID (int v[], int max, const char *id)
+{
+   int n= 0;
+   if (id && (max > 0))
+   {
+      char *pCh= getenv(id);
+      if (pCh && *pCh)
+      {
+         size_t t;
+         int nCh= 0;
+         do
+         {
+            nCh= scanZD(&t, pCh);
+            if (nCh > 0)
+            {
+               pCh+= nCh;
+               v[n++]= (int)t;
+            }
+         } while ((nCh>0) && *pCh && (n < max));
+      }
+   }
+   return(n);
+} // scanEnvID
+
 int contigCharSetN (const char s[], const int maxS, const char t[], const int maxT)
 {
    int n= 0;

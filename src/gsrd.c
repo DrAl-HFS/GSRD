@@ -255,7 +255,7 @@ int main ( int argc, char* argv[] )
 
             saveFrame(pFrame+k, &(gCtx.org), &ai);
          } while (gCtx.iter < pPI->maxIter);
-         fprintf(stderr,"%zu %G\n", pPI->maxIter, tE1);
+         fprintf(stderr,"%s\t%zu\t%zu\t%G\n", pFrame->label, pPI->maxIter, pPI->subIter, tE1);
          if (nIdx < 4) { fIdx[nIdx++]= afb+k; }
          afb+= 2;
       } while (procSetNextAcc(PROC_NOWRAP));

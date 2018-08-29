@@ -23,7 +23,7 @@
 
 typedef struct
 {
-   U8 c, n;
+   U8 c, n, x[2];
 } AccDev;
 
 typedef struct
@@ -79,7 +79,7 @@ int omp_get_thread_num (void) { return(0); }
 
 /*** Misc util ***/
 
-static void addDevType (AccDevTable *pT, const U8 c, const U8 nC)
+static void addDevType (AccDevTable *pT, const U8 c, const U8 nC, const U8 x0, const U8 x1)
 {
    int n= nC;
    U8 nA= 0;
@@ -89,6 +89,8 @@ static void addDevType (AccDevTable *pT, const U8 c, const U8 nC)
       {
          pT->d[pT->nDev].c= c;
          pT->d[pT->nDev].n= n;
+         pT->d[pT->nDev].x[0]= x0;
+         pT->d[pT->nDev].x[1]= x1;
          ++(pT->nDev);
       }
    }
@@ -469,14 +471,17 @@ Bool32 procInitAcc (size_t f) // arg param ?
    gDev.iHost= -1;
    if ((nH > 0) && (f & PROC_FLAG_ACCHOST))
    {
-      printf("\tH:id=%d\n", acc_get_device_num(acc_device_host));
-      addDevType(&gDev, acc_device_host, nH);
+      int v[2]=0;
+      scanEnvID(v+0, 1, "ACC_NUM_CORES");
+      scanEnvID(v+1, 1, "OMP_NUM_THREADS");
+      printf("\tH: C%d T%d id=%d\n", v[0], v[1], acc_get_device_num(acc_device_host));
+      addDevType(&gDev, acc_device_host, nH, v[0], v[1]);
       gDev.iHost= 0;
    }
    if ((nNV > 0) && (f & PROC_FLAG_ACCGPU))
    {
       printf("\tNV:id=%d\n", acc_get_device_num(acc_device_nvidia));
-      addDevType(&gDev, acc_device_nvidia, nH);
+      addDevType(&gDev, acc_device_nvidia, nNV, 0, 0);
    }
    initOK+= gDev.nDev;
    if (gDev.nDev > 0)
@@ -491,6 +496,7 @@ const char *procGetCurrAccTxt (char t[], int m)
 {
    const AccDev * const pA= gDev.d + gDev.iCurr;
    const char *s="C";
+   int n=0;
 #ifdef ACC
    switch (pA->c)
    {
@@ -499,7 +505,11 @@ const char *procGetCurrAccTxt (char t[], int m)
       default : s= "?"; break;
    }
 #endif // ACC
-   snprintf(t, m, "%s%u", s, pA->n);
+   n= snprintf(t, m, "%s%u", s, pA->n);
+   if ((pA->x[0] > 0) || (pA->x[1] > 0))
+   {
+      n+= snprintf(t+n, m-n, "C%uT%u", pA->x[0], pA->x[1]);
+   }
    return(t);
 } // procGetCurrAccTxt
 
