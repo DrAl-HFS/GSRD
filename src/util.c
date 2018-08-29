@@ -179,7 +179,10 @@ size_t scanDFI (DataFileInfo * pDFI, const char * const path)
       pDFI->nV=    scanVI(pDFI->v, 4, &(pDFI->vSS), name);
       pCh= name + pDFI->vSS.start + pDFI->vSS.len;
       pDFI->elemBits= scanChZ(pCh, 'F');
-      scanRevZD(&(pDFI->iter), name, pDFI->vSS.start-1);
+      if (pDFI->elemBits > 0)
+      {
+         scanRevZD(&(pDFI->iter), name, pDFI->vSS.start-1);
+      }
       if (pDFI->nV > 0)
       {
          size_t bits= pDFI->elemBits;

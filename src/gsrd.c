@@ -152,7 +152,7 @@ size_t compare (HostFB * const pF1, HostFB * const pF2, const ImgOrg * const pO,
    IdxSpan tabDiff[MAX_TAB_IS];
    U32 nTabDiff= 0;
 
-   printf("----\ncompare() - iter: %zu\t\t%zu\n", pF1->iter, pF2->iter);
+   printf("----\ncompare() - (id:iter) %s:%zu\t\t%s:%zu\n", pF1->label, pF1->iter, pF2->label, pF2->iter);
 
    initNFS(sa, 3, NULL, 0);
    initNFS(sb, 3, NULL, 0);
@@ -218,7 +218,6 @@ int main ( int argc, char* argv[] )
    {
       SMVal tE0, tE1;
       HostFB *pFrame, *pF2=NULL;
-      char t[8];
       U8 afb=0, nIdx=0, fIdx[4], k=0;
 
       do
@@ -236,7 +235,8 @@ int main ( int argc, char* argv[] )
          gCtx.iter= pFrame->iter;
          //k= (gCtx.iter - pFrame->iter) & 0x1;
          summarise(pFrame, &(gCtx.org));
-         printf("---- %s ----\n", procGetCurrAccTxt(t, sizeof(t)-1));
+         printf("---- %s ----\n", procGetCurrAccTxt(pFrame->label, sizeof(pFrame->label)-1));
+         memcpy(pFrame[1].label, pFrame[0].label, sizeof(pFrame->label));
          do
          {
             size_t iR= pPI->maxIter - gCtx.iter;
@@ -269,9 +269,10 @@ int main ( int argc, char* argv[] )
       if ((nIdx > 0) && (nIdx < 4))
       {
          fIdx[nIdx]= ( fIdx[nIdx-1] + 1 ) & 0x3;
-         if (loadFrame( gCtx.hbt.hfb+fIdx[nIdx], &(ai.files.cmp) ))
+         pF2= gCtx.hbt.hfb + fIdx[nIdx];
+         if (loadFrame( pF2, &(ai.files.cmp) ))
          {
-            pF2= gCtx.hbt.hfb + fIdx[nIdx];
+            snprintf(pF2->label, sizeof(pF2->label)-1, "CF");
             nErr= compare(pFrame, pF2, &(gCtx.org), 1.0/(1<<10));
          }
       }
