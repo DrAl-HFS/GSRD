@@ -90,7 +90,7 @@ run: $(TARGET)
 	./$(TARGET) $(DATAFILE) -C:$(CMP_FILE) $(RUNFLAGS)
 
 runacc: $(TARGET)
-	./$(TARGET) $(DATAFILE) -C:$(CMP_FILE) $(RUNFLAGS) $(RUNOPT)
+	./$(TARGET) $(DATAFILE) -C:$(CMP_FILE) $(RUNFLAGS) $(RUNOPT) 2>> log.txt
 
 verify:
 
