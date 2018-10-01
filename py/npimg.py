@@ -8,6 +8,8 @@ from scipy import stats
 from scipy import ndimage
 from PIL import Image
 
+import os
+import fnmatch
 
 def saveFrame(name,ina):
     img= Image.fromarray(ina)
@@ -30,13 +32,7 @@ def scanFileName (name):
         #print "lN=",lN
     return l1S[0], lN
 
-### ###
-if len(sys.argv) > 1:
-    name= sys.argv[1]
-else:
-    name= "raw/gsrd00000(256,256,2)F64.raw"
-
-try:
+def convert (inpath,name,outpath):
     prefix, lN= scanFileName(name)
     if len(lN) < 2 or len(lN) > 4:
         print "WARNING: bad def", lN
@@ -46,10 +42,9 @@ try:
             defN= (lN[0], lN[1], lN[2])
             if len(lN) >= 4:
                 defN= (lN[0], lN[1], lN[2], lN[3])
-
     defRGB=(defN[0], defN[1], 3)
     img= numpy.zeros(defRGB, dtype=numpy.uint8, order='C')
-    vt= numpy.fromfile(name, numpy.float64, -1, '')
+    vt= numpy.fromfile(inpath+'/'+name, numpy.float64, -1, '')
     #print vt.shape
     if len(vt) == numpy.prod(defN):
         _nP= numpy.prod(defPlane)
@@ -76,7 +71,35 @@ try:
             rnb= 255.0 / mmb[1]
         img[... ,0]= rna * a
         img[... ,2]= rnb * b
-        saveFrame(prefix,img)
+        saveFrame(outpath+'/'+prefix,img)
+
+### ###
+outpath='.'
+if len(sys.argv) > 1:
+    name= sys.argv[1]
+    if len(sys.argv) > 2:
+        outpath= sys.argv[2]
+else:
+    name= "raw/gsrd*F64.raw"
+    outpath= 'png'
+
+try:
+    i= name.find('*')
+    if i > -1:
+        j= name.rfind('/')
+        if j > -1 and j < i:
+            #print name, j, i
+            inpath=name[0:j]
+            pattern=name[j+1:]
+            #print inpath, pattern
+        else:
+            inpath='.'
+            pattern= name
+        flist= fnmatch.filter(os.listdir(inpath), pattern)
+        for fname in flist:
+            convert(inpath,fname,outpath)
+    else:
+        convert(name)
 
 except KeyboardInterrupt:
     print("\nbye...\n")
