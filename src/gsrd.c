@@ -14,23 +14,26 @@ typedef struct
 
 /***/
 
-static const Scalar gKL[3]= {-1, 0.2, 0.05};
+static const Scalar gKL[3]= {-32.0/32, 5.0/32, 3.0/32};
 
 static Context gCtx={0};
 
 /***/
 
-Context *initCtx (Context * const pC, U16 w, U16 h, U16 nF)
+Context *initCtx (Context * const pC, const V2U16 * const pD, U16 nF)
 {
-   if (0 == w) { w= 256; }
-   if (0 == h) { h= 256; }
+   U16 w, h;
+   if (pD) { w= pD->x; h= pD->y; } else { w= 256; h= 256; }
    if (0 == nF) { nF= 4; }
    const size_t n= w * h;
    const size_t b2F= 2 * n * sizeof(Scalar);
 
    if (b2F > n)
    {
-      initParam(&(pC->pv), gKL, &(pC->org.def), 0.100, 0.005);
+      InitSpatVarParam sv={0.100, 0.005, };
+      sv.max= MAX(w, h);
+
+      initParam(&(pC->pv), gKL, NULL, NULL, &sv);
 
       initOrg(&(pC->org), w, h, 0);
       
@@ -91,7 +94,7 @@ size_t saveFrame
       if (pA->files.outName) { n+= snprintf(path+n, m-n, "%s", pA->files.outName); }
       else { n+= snprintf(path+n, m-n, "%s", "gsrd"); } 
 
-      n+= snprintf(path+n, m-n, "%05lu(%lu,%lu,2)F64.raw", pFB->iter, pO->def.x, pO->def.y);
+      n+= snprintf(path+n, m-n, "%07lu(%lu,%lu,2)F64.raw", pFB->iter, pO->def.x, pO->def.y);
       r= saveBuff(pFB->pAB, path, sizeof(Scalar) * pO->n);
       printf("saveFrame() - %s %p %zu bytes\n", path, pFB->pAB, r);
    }
@@ -200,6 +203,13 @@ size_t compare (HostFB * const pF1, HostFB * const pF2, const ImgOrg * const pO,
    return(sa[1].n + sa[2].n + sb[1].n + sb[2].n);
 } // compare
 
+const V2U16 *selectDef (const DataFileInfo * const pIF, const InitInfo * const pII)
+{
+   if (pIF && (pIF->nV > 1)) return &(pIF->def);
+   if (pII && (pII->nD > 1)) return &(pII->def);
+   return(NULL);
+} // selectDef
+
 int main ( int argc, char* argv[] )
 {
    int n= 0, i= 0, nErr= 0;
@@ -213,8 +223,9 @@ int main ( int argc, char* argv[] )
    procTest();
 
    const DataFileInfo * const pIF= &(ai.files.init);
+   const InitInfo * const pII= &(ai.init);
    const ProcInfo * const pPI= &(ai.proc);
-   if (procInitAcc(pPI->flags) && initCtx(&gCtx, pIF->v[0], pIF->v[1], 8))
+   if (procInitAcc(pPI->flags) && initCtx(&gCtx, selectDef(pIF, pII), 8))
    {
       SMVal tE0, tE1;
       HostFB *pFrame, *pF2=NULL;
@@ -229,7 +240,7 @@ int main ( int argc, char* argv[] )
          pFrame= gCtx.hbt.hfb + afb;
          if (0 == loadFrame(pFrame, pIF))  //printf("nB=%zu\n",
          {
-            initHFB(pFrame, gCtx.org.def, 32);
+            initHFB(pFrame, &(gCtx.org), pII->patternID);
             saveFrame(pFrame, &(gCtx.org), &ai);
          }
          gCtx.iter= pFrame->iter;

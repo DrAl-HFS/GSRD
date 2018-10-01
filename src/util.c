@@ -177,6 +177,7 @@ size_t scanDFI (DataFileInfo * pDFI, const char * const path)
 
       pDFI->bytes= bytes;
       pDFI->nV=    scanVI(pDFI->v, 4, &(pDFI->vSS), name);
+      if (pDFI->nV > 1) { pDFI->def.x= pDFI->v[0]; pDFI->def.y= pDFI->v[1]; }
       pCh= name + pDFI->vSS.start + pDFI->vSS.len;
       pDFI->elemBits= scanChZ(pCh, 'F');
       if (pDFI->elemBits > 0)
@@ -270,14 +271,45 @@ int scanArgs (ArgInfo *pAI, const char * const a[], int nA)
                //printf("cmp:iter=%zu\n", pAI->files.cmp.iter);
                break;
 
+            case 'D' :
+               {  long l;
+                  char *pE=NULL;
+                  //nV= scanVI(v, 2, NULL, pCh+n);
+                  l= strtol(pCh+n, (char**)&pE, 10);
+                  if ((l > 0) && (l <= (1<<14)))
+                  { 
+                     pAI->init.def.x= pAI->init.def.y= l;
+                     if (pE && *pE)
+                     {
+                        pE= sc(pE,',',NULL,1);
+                        if (pE)
+                        {
+                           l= strtol(pE, (char**)&pE, 10);
+                           if ((l > 0) && (l <= (1<<14))) { pAI->init.def.y= l; }
+                        }
+                     }
+                     pAI->init.nD= 2;
+                  }
+                  //printf("DEF:%s -> %d, %u %u\n", pCh+n, l, pAI->init.def.x, pAI->init.def.y);
+               }
+               break;
+
             case 'I' :
                n+= scanZD(&(pAI->proc.maxIter), pCh+n);
                n+= contigCharSetN(pCh+n, 2, ",;:", 3);
                n+= scanZD(&(pAI->proc.subIter), pCh+n);
                ++nV;
                break;
-          
+
+           
             case 'O' : pAI->files.outPath= pCh+n;
+               break;
+
+            case 'P' :
+               {
+                  long l= strtol(pCh+n, NULL, 10);
+                  if (l >= 0) { pAI->init.patternID= l; }
+               }
                break;
 
             default : printf("scanArgs() - unknown flag -%c\n", c);

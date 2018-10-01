@@ -78,6 +78,7 @@ typedef struct
    size_t      bytes, iter;
    ScanSeg     vSS;
    int         v[4], nV;
+   V2U16       def;
    U8          elemBits;
    U8          flags;
    U8          pad[2];
@@ -91,12 +92,20 @@ typedef struct
 
 typedef struct
 {
+   V2U16 def;
+   U8    nD, patternID; //, laplaceID, rateID, spatVarID ???
+   U8    pad[2]; // 
+} InitInfo;
+
+typedef struct
+{
    size_t   flags, maxIter, subIter;
 } ProcInfo;
 
 typedef struct
 {
    FileInfo files;
+   InitInfo init;
    ProcInfo proc;
 } ArgInfo;
 

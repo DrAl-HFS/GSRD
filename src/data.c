@@ -4,6 +4,11 @@
 
 #include "data.h"
 
+static const InitLapRateScale gILRS[]={{0.5, 0.1}, {KLA0,KLB0}};
+// Knotwork emergence from about D=0.066, becoming granular from about 0.074
+static const RRDParam          gRRDP[]={{1.0, 0.023, 0.072},{1.0, 0.023, 0.072},{KR0,KRA0,KDB0}};
+static const InitSpatVarParam gISVP[]={0.100, 0.005};
+
 /***/
 //deprecate
 static void initWrap (BoundaryWrap *pW, const Stride stride[4])
@@ -59,26 +64,53 @@ void initOrg (ImgOrg * const pO, U16 w, U16 h, U8 flags)
 } // initOrg
 
 //size_t paramBytes (U16 w, U16 h) { return(MAX(w,h) * 3 * sizeof(Scalar)); }
+Scalar validateKL (Scalar kR[3], const Scalar kL[3])
+{
+   Scalar w= 1, t= kL[1] + kL[2];
+   
+   if (t > 1) { w= 1 / t; }
+   //do
+   {
+      kR[0]= -4 * w * t;
+      kR[1]= w * kL[1];
+      kR[2]= w * kL[2];
+   } //while (kR[0] != t)
+   return(kR[0] + 4 * (kR[1] + kR[2]));
+} // validateKL
 
-size_t initParam (ParamVal * const pP, const Scalar kL[3], const V2U32 *pD, Scalar varR, Scalar varD) // ParamArgs *
+size_t initParam
+(
+   ParamVal * const pP, 
+   const Scalar            kL[3], 
+   const InitLapRateScale * pRS, 
+   const RRDParam          * pRRD, 
+   const InitSpatVarParam * pSV
+)
 {
    U32 i, n= 0;
-    // Set diffusion weights
-   for ( i= 0; i<3; ++i ) { pP->base.kL.a[i]= kL[i] * KLA0; pP->base.kL.b[i]= kL[i] * KLB0; }
-   pP->base.kRR= KR0;
-   pP->base.kRA= KRA0;
-   pP->base.kDB= KDB0;
+   Scalar kV[3];
+
+   if (NULL == pRS) { pRS= gILRS; }
+   if (NULL == pRRD) { pRRD= gRRDP; } 
+   if (NULL == pSV) { pSV= gISVP; }
+ 
+   // Set diffusion weights
+   printf("initParam() - kL:e=%.f\n", validateKL(kV, kL));
+   for ( i= 0; i<3; ++i ) { pP->base.kL.a[i]= kV[i] * pRS->rLA; pP->base.kL.b[i]= kV[i] * pRS->rLB; }
+   // reaction rates
+   pP->base.kRR= pRRD->kRR;
+   pP->base.kRA= pRRD->kRA;
+   pP->base.kDB= pRRD->kDB;
 
    pP->var.pK= NULL;
-   if (pD)
+   if (pSV)
    {
-      n= MAX(pD->x, pD->y);
-      pP->var.pK= malloc( 3 * n * sizeof(*(pP->var.pK)) );
+      pP->var.pK= malloc( 3 * pSV->max * sizeof(*(pP->var.pK)) );
    }
-   if (pP->var.pK)
+   if (pP->var.pK && pSV)
    {
       Scalar *pKRR, *pKRA, *pKDB;
-      Scalar kRR=KR0, kRA=KRA0, kDB=KDB0;
+      Scalar kRR=pRRD->kRR, kRA=pRRD->kRA, kDB=pRRD->kDB;
       Scalar dKRR=0, dKRA=0, dKDB=0;
       
       pP->var.iKRR= 0; pP->var.iKRA= pP->var.iKRR + n; pP->var.iKDB= pP->var.iKRA+n;
@@ -86,8 +118,8 @@ size_t initParam (ParamVal * const pP, const Scalar kL[3], const V2U32 *pD, Scal
       pKRA= pP->var.pK + pP->var.iKRA;
       pKDB= pP->var.pK + pP->var.iKDB;
 
-      dKRR= (kRR * varR) / n;
-      dKDB= (kDB * varD) / n;
+      dKRR= (kRR * pSV->varR) / n;
+      dKDB= (kDB * pSV->varD) / n;
       for (i= 0; i<n; ++i)
       {
          pKRR[i]= kRR; kRR+= dKRR;
@@ -143,20 +175,49 @@ void releaseHBT (HostBuffTab * const pT)
 } // releaseHBT
 
 
-size_t initHFB (HostFB * const pB, const V2U32 d, const U16 step)
+size_t initHFB (HostFB * const pB, const ImgOrg * const pO, const U8 patternID)
 {
-   const size_t n= d.x * d.y;
-   size_t  i, nB= 0;
-   U16 x, y;
-   // HACKY: assumes planar org.
-   for ( i= 0; i < n; ++i ) { pB->pAB[i]= 1.0; pB->pAB[n+i]= 0.0; }
-   for ( y= step; y < d.y; y+= step )
-   {
-      for ( x= step; x < d.x; x+= step )
+   size_t i, j, nB= 0;
+   int x, y, ix, iy, mx, my;
+   memset(pB->pAB, 0, pO->n * sizeof(*(pB->pAB)));
+   for (y= 0; y < pO->def.y; y++)
+   { 
+      for (x= 0; x < pO->def.x; x++)
       {
-         i= y * d.x + x;
-         if (i < n) { pB->pAB[n+i]= 1.0; nB++; }
+         i= x * pO->stride[0] + y * pO->stride[1];
+         pB->pAB[i]= 0.5 + 0.5 * (1 & (x ^ y));
       }
+   }
+   switch ( patternID )
+   {
+      case 1 :
+      case 2 :
+      {
+         int k= MIN(pO->def.x, pO->def.y) / 32;
+         mx= pO->def.x / 2; my= pO->def.y / 2;
+         for (y= -k; y < k; y++)
+         { 
+            for (x= -k; x < k; x++)
+            {
+               if ((patternID & 1) || ((x*x + y*y) <= (k*k)))
+               {
+                  i= (mx+x) * pO->stride[0] + (my+y) * pO->stride[1];
+                  j= i + pO->stride[3];
+                  pB->pAB[i]= 0.5; pB->pAB[j]= 0.25; 
+                  nB++;
+               }
+            }
+         }
+      }
+      break;
+      default:
+      {
+         i= (pO->stride[1] + pO->stride[2] ) / 2; // midpoint
+         j= i + pO->stride[3];
+         pB->pAB[i]= 0.5; pB->pAB[j]= 0.25; 
+         nB++;
+      }
+      break;
    }
    pB->iter= 0;
    // stat ?

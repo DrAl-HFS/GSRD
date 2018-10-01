@@ -122,7 +122,7 @@ INLINE void proc1 (Scalar * const pR, const Scalar * const pS, const Index i, co
 {
    const Scalar * const pA= pS+i, a= *pA;
    const Scalar * const pB= pS+i+j, b= *pB;
-   const Scalar rab2= pP->kRR * a * b * b;
+   const Scalar rab2= a * b * b; //pP->kRR * 
 
    pR[i]= a + laplace2D4S9P(pA, wrap, pP->kL.a) - rab2 + pP->kRA * (1 - a);
    pR[i+j]= b + laplace2D4S9P(pB, wrap, pP->kL.b) + rab2 - pP->kDB * b;
