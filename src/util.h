@@ -67,6 +67,7 @@ typedef struct
 
 typedef struct { U16 x, y; } V2U16;
 typedef struct { U32 x, y; } V2U32;
+typedef struct { I32 min, max; } MinMaxI32;
 typedef struct { U32 min, max; } MinMaxU32;
 typedef struct { size_t min, max; } MinMaxZU;
 
@@ -87,7 +88,7 @@ typedef struct
 typedef struct
 {
    DataFileInfo   init, cmp;
-   const char     *outPath, *outName;
+   const char     *lutPath, *outPath, *outName;
 } FileInfo;
 
 typedef struct
@@ -99,19 +100,33 @@ typedef struct
 
 typedef struct
 {
+   float v[3];
+   U8    nV;
+   char  id[3];
+} ParamInfo;
+
+typedef struct
+{
    size_t   flags, maxIter, subIter;
 } ProcInfo;
 
 typedef struct
 {
-   FileInfo files;
-   InitInfo init;
-   ProcInfo proc;
+   FileInfo    files;
+   InitInfo    init;
+   ParamInfo   param;
+   ProcInfo    proc;
 } ArgInfo;
 
+typedef struct { union { void *p; size_t w; }; size_t b; } Buffer; // char *p;
+
+// Marsaglia MWC PRNG
+typedef struct { uint z, w; } SeedMMWC;
+typedef struct { float f[2]; SeedMMWC s; } RandF;
 
 /***/
 
+extern Bool32 validBuff (const Buffer *pB, size_t b);
 extern size_t fileSize (const char * const path);
 extern size_t loadBuff (void * const pB, const char * const path, const size_t bytes);
 extern size_t saveBuff (const void * const pB, const char * const path, const size_t bytes);
@@ -121,8 +136,17 @@ extern U32 statGetRes1 (StatRes1 * const pR, const StatMom * const pS, const SMV
 
 extern int scanEnvID (int v[], int max, const char *id);
 
+extern int skipPastSet (const char str[], const char set[]);
+extern int scanTableF32 (float v[], int maxV, MinMaxI32 *pW, const char str[], int *pNS, const int maxS);
+
 // extern const char *sc (const char *s, const char c, const char * const e, const I8 o);
 //extern int scanVI (int v[], const int vMax, ScanSeg * const pSS, const char s[]);
 extern int scanArgs (ArgInfo * pAI, const char * const a[], int nA);
+
+extern uint randMMWC (SeedMMWC *pS);
+extern void initSeedMMWC (SeedMMWC *pS, U16 id);
+extern double randN (RandF *pRF);
+extern void initRF (RandF *pRF, float scale, float offset, U16 sid);
+extern float randF (RandF *pRF);
 
 #endif // UTIL_H

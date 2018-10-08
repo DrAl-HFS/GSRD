@@ -6,7 +6,8 @@
 
 static const InitLapRateScale gILRS[]={{0.5, 0.1}, {KLA0,KLB0}};
 // Knotwork emergence from about D=0.066, becoming granular from about 0.074
-static const RRDParam          gRRDP[]={{1.0, 0.023, 0.072},{1.0, 0.023, 0.072},{KR0,KRA0,KDB0}};
+static const RRDParam          gRRDP[]={{0.5, 0.023, 0.072},{1.0, 0.023, 0.072},{KR0,KRA0,KDB0}};
+//static const ParamInfo         gPI[]={{0.023, 0.072,}, 2, {0,}};
 static const InitSpatVarParam gISVP[]={0.100, 0.005};
 
 /***/
@@ -78,29 +79,56 @@ Scalar validateKL (Scalar kR[3], const Scalar kL[3])
    return(kR[0] + 4 * (kR[1] + kR[2]));
 } // validateKL
 
+double reactSafeLim (const Scalar kV[3], const InitLapRateScale * const pRS)
+{
+   //return(1 - 4 * (kV[1] + kV[2]) * MAX(pRS->rLA, pRS->rLB) );
+   return(1 + kV[0] * MAX(pRS->rLA, pRS->rLB) );
+} // reactSafeLim
+
 size_t initParam
 (
    ParamVal * const pP, 
    const Scalar            kL[3], 
    const InitLapRateScale * pRS, 
-   const RRDParam          * pRRD, 
+   const ParamInfo         * pPI, 
    const InitSpatVarParam * pSV
 )
 {
    U32 i, n= 0;
    Scalar kV[3];
+   RRDParam rrd= gRRDP[0];
+   InitLapRateScale rs= gILRS[0];
 
-   if (NULL == pRS) { pRS= gILRS; }
-   if (NULL == pRRD) { pRRD= gRRDP; } 
+   if (NULL != pRS) { rs= *pRS; }
    if (NULL == pSV) { pSV= gISVP; }
+
+   if (pPI)
+   {
+      for ( i= 0; i < pPI->nV; ++i )
+      {
+         if ((pPI->v[i] > 0.0) && (pPI->v[i] < 1.0)) switch(pPI->id[i])
+         { 
+            case 'D' :
+            case 'B' : rrd.kDB= pPI->v[i]; break;
+            case 'R' :
+            case 'A' : rrd.kRA= pPI->v[i]; break;
+            case 'L' : rs.rLB= pPI->v[i]; break;
+         }
+      }
+   }
  
    // Set diffusion weights
    printf("initParam() - kL:e=%.f\n", validateKL(kV, kL));
-   for ( i= 0; i<3; ++i ) { pP->base.kL.a[i]= kV[i] * pRS->rLA; pP->base.kL.b[i]= kV[i] * pRS->rLB; }
+   for ( i= 0; i<3; ++i ) { pP->base.kL.a[i]= kV[i] * rs.rLA; pP->base.kL.b[i]= kV[i] * rs.rLB; }
+   printf("Laplacian Parameters Committed: %G %G\n", rs.rLA, rs.rLB);
    // reaction rates
-   pP->base.kRR= pRRD->kRR;
-   pP->base.kRA= pRRD->kRA;
-   pP->base.kDB= pRRD->kDB;
+   rrd.kRR= reactSafeLim(kV, &rs);
+
+   //if (pRRD->kRR > rrd.kRR) { printf("WARNING: initParam() - reaction rate %G exceeds safe (diffusion defined) limit %G\n", pRRD->kRR, rrd.kRR); }
+   pP->base.kRR= rrd.kRR;
+   pP->base.kRA= rrd.kRA;
+   pP->base.kDB= rrd.kDB;
+   printf("Rate Parameters Committed: %G %G %G\n", rrd.kRR, rrd.kRA, rrd.kDB);
 
    pP->var.pK= NULL;
    if (pSV)
@@ -110,7 +138,7 @@ size_t initParam
    if (pP->var.pK && pSV)
    {
       Scalar *pKRR, *pKRA, *pKDB;
-      Scalar kRR=pRRD->kRR, kRA=pRRD->kRA, kDB=pRRD->kDB;
+      Scalar kRR=rrd.kRR, kRA=rrd.kRA, kDB=rrd.kDB;
       Scalar dKRR=0, dKRA=0, dKDB=0;
       
       pP->var.iKRR= 0; pP->var.iKRA= pP->var.iKRR + n; pP->var.iKDB= pP->var.iKRA+n;
@@ -179,6 +207,10 @@ size_t initHFB (HostFB * const pB, const ImgOrg * const pO, const U8 patternID)
 {
    size_t i, j, nB= 0;
    int x, y, ix, iy, mx, my;
+   RandF rf={{0,0},};
+
+   if (patternID & 0x4) { initRF(&rf, 0.25, -0.125, 54321); }
+
    memset(pB->pAB, 0, pO->n * sizeof(*(pB->pAB)));
    for (y= 0; y < pO->def.y; y++)
    { 
@@ -188,7 +220,7 @@ size_t initHFB (HostFB * const pB, const ImgOrg * const pO, const U8 patternID)
          pB->pAB[i]= 0.5 + 0.5 * (1 & (x ^ y));
       }
    }
-   switch ( patternID )
+   switch ( patternID & 0x3 )
    {
       case 1 :
       case 2 :
@@ -199,11 +231,11 @@ size_t initHFB (HostFB * const pB, const ImgOrg * const pO, const U8 patternID)
          { 
             for (x= -k; x < k; x++)
             {
-               if ((patternID & 1) || ((x*x + y*y) <= (k*k)))
+               if ((1 == patternID) || ((x*x + y*y) <= (k*k)))
                {
                   i= (mx+x) * pO->stride[0] + (my+y) * pO->stride[1];
                   j= i + pO->stride[3];
-                  pB->pAB[i]= 0.5; pB->pAB[j]= 0.25; 
+                  pB->pAB[i]= 0.5; pB->pAB[j]= 0.25 + randF(&rf); 
                   nB++;
                }
             }

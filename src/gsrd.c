@@ -3,6 +3,7 @@
 // (c) GSRD Project Contributors Feb-April 2018
 
 #include "proc.h"
+#include "image.h"
 
 typedef struct
 {
@@ -10,17 +11,18 @@ typedef struct
    HostBuffTab hbt;
    ImgOrg      org;
    size_t      iter;
+   Buffer      ws;
 } Context;
 
 /***/
 
-static const Scalar gKL[3]= {-32.0/32, 5.0/32, 3.0/32};
+static const Scalar gKL[3]= {-1020.0/1024, 170.0/1024, 85.0/1024};
 
 static Context gCtx={0};
 
 /***/
 
-Context *initCtx (Context * const pC, const V2U16 * const pD, U16 nF)
+Context *initCtx (Context * const pC, const V2U16 * const pD, U16 nF, const ArgInfo * const pAI)
 {
    U16 w, h;
    if (pD) { w= pD->x; h= pD->y; } else { w= 256; h= 256; }
@@ -33,10 +35,19 @@ Context *initCtx (Context * const pC, const V2U16 * const pD, U16 nF)
       InitSpatVarParam sv={0.100, 0.005, };
       sv.max= MAX(w, h);
 
-      initParam(&(pC->pv), gKL, NULL, NULL, &sv);
+      initParam(&(pC->pv), gKL, NULL, &(pAI->param), &sv);
 
       initOrg(&(pC->org), w, h, 0);
-      
+
+      pC->ws.b= w * h * 4 + (8<<10);
+      pC->ws.b&= ~((4 << 10) - 1);
+      pC->ws.p= malloc(pC->ws.b);
+
+      if (pAI->files.lutPath)
+      { // "init/viridis-table-byte-0256.csv"
+         imageLoadLUT(&(pC->ws), pAI->files.lutPath);
+      }
+
       if (initHBT(&(pC->hbt), b2F, nF))
       {
          pC->iter= 0;
@@ -52,6 +63,7 @@ void releaseCtx (Context * const pC)
    {
       releaseParam(&(pC->pv));
       releaseHBT(&(pC->hbt));
+      if (pC->ws.p) { free(pC->ws.p); }
       memset(pC, 0, sizeof(*pC));
    }
 } // releaseCtx
@@ -70,6 +82,18 @@ size_t loadFrame
    }
    return(r);
 } // loadFrame
+
+void saveRGB (const HostFB * const pF)
+{
+   const ImgOrg * pO= &(gCtx.org);
+   U8 *pB= gCtx.ws.p;
+   char path[256];
+   int m= sizeof(path)-1, n= 0;
+   n+= snprintf(path+n, m-n, "gsrd%07luS%lux%luU8.rgb", pF->iter, pO->def.x, pO->def.y);
+   printf("saveRGB() - %s %p,%zu\n", path, gCtx.ws.p, gCtx.ws.b);
+   size_t b= imageTransferRGB(pB, pF->pAB, pO, 0);
+   saveBuff(pB, path, b);
+} // saveRGB
 
 size_t saveFrame 
 (
@@ -97,6 +121,7 @@ size_t saveFrame
       n+= snprintf(path+n, m-n, "%07lu(%lu,%lu,2)F64.raw", pFB->iter, pO->def.x, pO->def.y);
       r= saveBuff(pFB->pAB, path, sizeof(Scalar) * pO->n);
       printf("saveFrame() - %s %p %zu bytes\n", path, pFB->pAB, r);
+      saveRGB(pFB);
    }
    return(r);
 } // saveFrame
@@ -225,7 +250,7 @@ int main ( int argc, char* argv[] )
    const DataFileInfo * const pIF= &(ai.files.init);
    const InitInfo * const pII= &(ai.init);
    const ProcInfo * const pPI= &(ai.proc);
-   if (procInitAcc(pPI->flags) && initCtx(&gCtx, selectDef(pIF, pII), 8))
+   if (procInitAcc(pPI->flags) && initCtx(&gCtx, selectDef(pIF, pII), 8, &ai))
    {
       SMVal tE0, tE1;
       HostFB *pFrame, *pF2=NULL;

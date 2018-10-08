@@ -4,7 +4,6 @@
 #define GETTIME(a) gettimeofday(a,NULL)
 #define USEC(t1,t2) (((t2).tv_sec-(t1).tv_sec)*1000000+((t2).tv_usec-(t1).tv_usec))
 
-
 // Replacement for strchr() (not correctly supported by pgi-cc) with extras
 const char *sc (const char *s, const char c, const char * const e, const I8 o)
 {
@@ -35,6 +34,11 @@ const char *stripPath (const char *path)
 } // stripPath
 
 // const char *extractPath (char s[], int m, const char *pfe) {} // extractPath
+
+Bool32 validBuff (const Buffer *pB, size_t b)
+{
+   return(pB && pB->p && (pB->b >= b));
+} // validBuff
 
 size_t fileSize (const char * const path)
 {
@@ -152,6 +156,107 @@ int scanVI (int v[], const int vMax, ScanSeg * const pSS, const char s[])
    return(nI);
 } // scanVI
 
+int charInSet (const char c, const char set[])
+{
+   int i= 0;
+   while (set[i] && (set[i] != c)) { ++i; }
+   return(c == set[i]);
+} // charInSet
+ 
+int skipSet (const char s[], const char set[])
+{
+   int i= 0;
+   while (charInSet(s[i], set)) { ++i; }
+   return(i);
+} // skipSet
+
+int skipPastSet (const char str[], const char set[])
+{
+   int i= 0;
+   while (str[i] && !charInSet(str[i], set)) { ++i; }
+   while (charInSet(str[i], set)) { ++i; }
+   return(i);
+} // skipPastSet
+
+int scanNI32 (int v[], const int maxV, const char str[], int *pNS, const char skip[], const char end[])
+{
+   int s, nS=0, nV= 0;
+   if (maxV > 0)
+   {
+      const char *pE= str;
+      do
+      {
+         v[nV]= strtol(str+nS, &pE, 10);
+         s= pE - (str+nS);
+         if (s > 0)
+         {
+            ++nV;
+            s+= skipSet(pE,skip);
+            nS+= s;
+         }
+      } while ((nV < maxV) && (s > 0) && str[nS] && !charInSet(str[nS], end));
+      if (pNS) { *pNS= nS; }
+   }
+   return(nV);
+} // scanNI32
+
+int scanNF32 (float v[], const int maxV, const char str[], int *pNS, const char skip[], const char end[])
+{
+   int s, nS=0, nV= 0;
+   if (maxV > 0)
+   {
+      const char *pE=str;
+      do
+      {
+         v[nV]= strtof(str+nS, &pE);
+         s= pE - (str+nS);
+         if (s > 0)
+         {
+            ++nV;
+            s+= skipSet(pE,skip);
+            nS+= s;
+         }
+      } while ((nV < maxV) && (s > 0) && str[nS] && !charInSet(str[nS], end));
+      //printf("scanNF32() %p %d\n", v, nV);
+      if (pNS) { *pNS= nS; }
+   }
+   return(nV);
+} // scanNF32
+
+int scanTableF32 (float v[], int maxV, MinMaxI32 *pW, const char str[], int *pNS, const int maxS)
+{
+   MinMaxI32 w;
+   int nV=0, nS=0, s, n, i=0;
+
+   n= scanNF32(v, maxV-nV, str+nS, &s, ",", "\r\n");
+   if (n > 0)
+   {
+      if (s > 0) { nS+= s; }
+      w.min= w.max= nV= n;
+      while ((nS < maxS) && (nV < maxV) && (s > 0) && (n > 0))
+      {
+         s= skipPastSet(str+nS,"\r\n");
+         if (s > 0) { nS+= s; }
+         if (++i >= 255) { printf("scanTableF32() %d [%d]=%s\n", i, maxS-nS, str+nS); }
+         if (nS < maxS)
+         {
+            n= scanNF32(v+nV, maxV-nV, str+nS, &s, ",", "\r\n");
+            if (s > 0) { nS+= s; }
+            if (n > 0)
+            {
+               nV+= n;
+               w.min= MIN(w.min, n);
+               w.max= MAX(w.max, n);
+            }
+         }
+      } 
+      printf("scanTableF32() [%d] %G .. %G : %d*(%d,%d) %d\n", nV, v[0], v[nV-1], i, w.min, w.max, maxS-nS);
+      if (pNS) { *pNS= nS; }
+      if (pW) { *pW= w; }
+   }
+   return(nV);
+} // scanTableF32
+
 U8 scanChZ (const char *s, char c)
 {
    if (s)
@@ -244,7 +349,7 @@ int scanArgs (ArgInfo *pAI, const char * const a[], int nA)
    const char *pCh;
    ArgInfo tmpAI;
    int nV= 0;
-   
+
    if (NULL == pAI) { pAI= &tmpAI; }
    while (nA-- > 0)
    {
@@ -272,10 +377,12 @@ int scanArgs (ArgInfo *pAI, const char * const a[], int nA)
                break;
 
             case 'D' :
+               // int v[2]
+               //pAI->init.nD= scanNI32(v, 2, pCh+n);
                {  long l;
-                  char *pE=NULL;
+                  const char *pE=NULL;
                   //nV= scanVI(v, 2, NULL, pCh+n);
-                  l= strtol(pCh+n, (char**)&pE, 10);
+                  l= strtol(pCh+n, &pE, 10);
                   if ((l > 0) && (l <= (1<<14)))
                   { 
                      pAI->init.def.x= pAI->init.def.y= l;
@@ -284,7 +391,7 @@ int scanArgs (ArgInfo *pAI, const char * const a[], int nA)
                         pE= sc(pE,',',NULL,1);
                         if (pE)
                         {
-                           l= strtol(pE, (char**)&pE, 10);
+                           l= strtol(pE, &pE, 10);
                            if ((l > 0) && (l <= (1<<14))) { pAI->init.def.y= l; }
                         }
                      }
@@ -301,6 +408,9 @@ int scanArgs (ArgInfo *pAI, const char * const a[], int nA)
                ++nV;
                break;
 
+            case 'L' :
+               pAI->files.lutPath= pCh+n;
+               break;
            
             case 'O' : pAI->files.outPath= pCh+n;
                break;
@@ -310,6 +420,13 @@ int scanArgs (ArgInfo *pAI, const char * const a[], int nA)
                   long l= strtol(pCh+n, NULL, 10);
                   if (l >= 0) { pAI->init.patternID= l; }
                }
+               break;
+
+            case 'V' :
+               pAI->param.nV= scanNF32(pAI->param.v, 3, pCh+n, NULL, ",;:", "");
+               pAI->param.id[0]= 'B';
+               pAI->param.id[1]= 'A';
+               pAI->param.id[2]= 'L';
                break;
 
             default : printf("scanArgs() - unknown flag -%c\n", c);
@@ -322,6 +439,57 @@ int scanArgs (ArgInfo *pAI, const char * const a[], int nA)
    if (pAI->proc.subIter > pAI->proc.maxIter) SWAP(size_t, pAI->proc.subIter, pAI->proc.maxIter);
    return(nV);
 } // scanArgs
+
+// Marsaglia MWC PRNG
+uint randMMWC (SeedMMWC *pS)
+{
+    pS->z = 36969 * (pS->z & 0xFFFF) + (pS->z >> 16);
+    pS->w = 18000 * (pS->w & 0xFFFF) + (pS->w >> 16);
+    return (pS->z << 16) + pS->w;
+} // randMMWC
+
+double randN (RandF *pRF)
+{
+   size_t u= randMMWC(&(pRF->s));
+   return((1+u) * 1.0 / (2 + ((size_t)1 << 32))); // NB: closed interval
+} // randN
+
+static uint seedFromID (U16 id)
+{
+   uint i,n1,n2,t= 0xC5A3;
+   //printf("getseed()\n");
+   for (i=0; i<4; ++i)
+   {
+      n1= (id & 0x3) * 4;
+      id >>= 2;
+      n2= 1 + (id & 0x3);
+      id >>= 2;
+      t= t << (4 + n2);
+      t|= ((0xAC53 >> n1) & 0xF) << n2;
+      if (i & 1) { t|= (1 << n2)-1; }
+      //printf(" [%u] %u %u %u\n", i, n1, n2, t);
+   }
+   return(t);
+} // seedFromID
+
+void initSeedMMWC (SeedMMWC *pS, U16 id)
+{
+   pS->z= seedFromID(id);
+   pS->w= seedFromID(id ^ 0xFFFF);
+} // initSeedMMWC
+
+void initRF (RandF *pRF, float scale, float offset, U16 sid)
+{
+   pRF->f[0]= scale / (((size_t)1 << 32) - 1); // NB: open interval
+   pRF->f[1]= offset;
+   initSeedMMWC(&(pRF->s),sid);
+} // initRF
+
+float randF (RandF *pRF)
+{
+   return(randMMWC(&(pRF->s)) * pRF->f[0] + pRF->f[1]);
+} // randF
+
 
 #ifdef UTIL_TEST
 

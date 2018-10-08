@@ -20,7 +20,7 @@ typedef double       Scalar;
 typedef signed long  Stride;
 typedef signed long  Index;
 
-// Initialisation parameters
+// DEPRECATE: Initialisation parameters
 typedef struct
 {  // reaction, replenishment, death
    Scalar kRR, kRA, kDB;
@@ -120,7 +120,7 @@ extern size_t initParam
    ParamVal * const pP, 
    const Scalar            kL[3], // Symmetric 9-point kernel coefficients (subject to scaling)
    const InitLapRateScale * pRS, 
-   const RRDParam          * pRRD, 
+   const ParamInfo         * pPI, 
    const InitSpatVarParam * pSV
 ); // ParamArgs *
 
