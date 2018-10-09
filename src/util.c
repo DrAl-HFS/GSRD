@@ -237,7 +237,7 @@ int scanTableF32 (float v[], int maxV, MinMaxI32 *pW, const char str[], int *pNS
       {
          s= skipPastSet(str+nS,"\r\n");
          if (s > 0) { nS+= s; }
-         if (++i >= 255) { printf("scanTableF32() %d [%d]=%s\n", i, maxS-nS, str+nS); }
+         //if (++i >= 255) { printf("scanTableF32() %d [%d]=%s\n", i, maxS-nS, str+nS); }
          if (nS < maxS)
          {
             n= scanNF32(v+nV, maxV-nV, str+nS, &s, ",", "\r\n");
@@ -250,7 +250,7 @@ int scanTableF32 (float v[], int maxV, MinMaxI32 *pW, const char str[], int *pNS
             }
          }
       } 
-      printf("scanTableF32() [%d] %G .. %G : %d*(%d,%d) %d\n", nV, v[0], v[nV-1], i, w.min, w.max, maxS-nS);
+      //printf("scanTableF32() [%d] %G .. %G : %d*(%d,%d) %d\n", nV, v[0], v[nV-1], i, w.min, w.max, maxS-nS);
       if (pNS) { *pNS= nS; }
       if (pW) { *pW= w; }
    }
@@ -409,10 +409,23 @@ int scanArgs (ArgInfo *pAI, const char * const a[], int nA)
                break;
 
             case 'L' :
+               pAI->files.flags|= FLAG_FILE_LUT;
                pAI->files.lutPath= pCh+n;
                break;
            
-            case 'O' : pAI->files.outPath= pCh+n;
+            case 'O' :
+               pAI->files.flags|= FLAG_FILE_OUT;
+               if (pCh[n])
+               {
+                  U8 i= pAI->files.nOutPath++;
+                  if (i < 2)
+                  {
+                     pAI->files.outPath[i]= pCh+n;
+                     if (0 == strncmp("raw",pCh+n,3)) { pAI->files.outType[i]= 2; }
+                     else if (0 == strncmp("rgb",pCh+n,3)) { pAI->files.outType[i]= 3; }
+                     else { pAI->files.outType[i]= 0xFF; }
+                  }
+               }
                break;
 
             case 'P' :
@@ -420,6 +433,10 @@ int scanArgs (ArgInfo *pAI, const char * const a[], int nA)
                   long l= strtol(pCh+n, NULL, 10);
                   if (l >= 0) { pAI->init.patternID= l; }
                }
+               break;
+
+            case 'R' :
+               pAI->init.flags|= FLAG_INIT_ORG_INTERLEAVED;
                break;
 
             case 'V' :

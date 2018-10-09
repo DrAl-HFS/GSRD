@@ -37,6 +37,10 @@
 
 #define DFI_FLAG_VALIDATED (1<<0)
 
+#define FLAG_INIT_ORG_INTERLEAVED   (1<<0)
+#define FLAG_FILE_LUT  (1<<1)
+#define FLAG_FILE_OUT  (1<<0)
+
 
 typedef int Bool32;
 
@@ -87,15 +91,17 @@ typedef struct
 
 typedef struct
 {
-   DataFileInfo   init, cmp;
-   const char     *lutPath, *outPath, *outName;
+   DataFileInfo  init, cmp;
+   const char    *lutPath, *outName, *outPath[2];
+   U8             flags, nOutPath, outType[2];
 } FileInfo;
 
 typedef struct
 {
    V2U16 def;
-   U8    nD, patternID; //, laplaceID, rateID, spatVarID ???
-   U8    pad[2]; // 
+   U8    nD, patternID;
+   U8    flags;
+   U8    pad[1];
 } InitInfo;
 
 typedef struct

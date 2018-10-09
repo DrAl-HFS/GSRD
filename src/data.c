@@ -47,8 +47,8 @@ void initOrg (ImgOrg * const pO, U16 w, U16 h, U8 flags)
          pO->stride[3]= 1; // next phase
       }
       pO->stride[1]= w * pO->stride[0]; // line
-      pO->stride[2]= h * pO->stride[1]; // plane
-      pO->n= 2 * pO->stride[2]; // complete buffer
+      pO->stride[2]= h * pO->stride[1]; // plane / buffer
+      pO->n= 2 * w * h; // complete buffer
 // neighbours
       pO->nhStepWrap[0][0]= -pO->stride[0];
       pO->nhStepWrap[0][1]= pO->stride[0];
@@ -209,8 +209,6 @@ size_t initHFB (HostFB * const pB, const ImgOrg * const pO, const U8 patternID)
    int x, y, ix, iy, mx, my;
    RandF rf={{0,0},};
 
-   if (patternID & 0x4) { initRF(&rf, 0.25, -0.125, 54321); }
-
    memset(pB->pAB, 0, pO->n * sizeof(*(pB->pAB)));
    for (y= 0; y < pO->def.y; y++)
    { 
@@ -220,6 +218,8 @@ size_t initHFB (HostFB * const pB, const ImgOrg * const pO, const U8 patternID)
          pB->pAB[i]= 0.5 + 0.5 * (1 & (x ^ y));
       }
    }
+
+   if (patternID & 0x4) { initRF(&rf, 0.25, -0.125, 54321); }
    switch ( patternID & 0x3 )
    {
       case 1 :

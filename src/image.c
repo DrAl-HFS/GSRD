@@ -68,28 +68,34 @@ static int validLUT (const float *pF, const int nF, const MinMaxI32 *pMM)
    return(0);
 } // validLUT
 
+void clean (signed char *pS, size_t n)
+{
+   while (pS[n] < ' ') { printf("[%zu] 0x%02X\n", n, 0xFF & pS[n]); --n; }
+} // clean
+
 int imageLoadLUT (Buffer *pB, const char path[])
 {
    size_t b= fileSize(path);
-
-   if ((b > 0) && validBuff(pB, b+1)) 
+   int pad= 4 - (b & 0x3);
+   if ((b > 0) && validBuff(pB, b + pad)) 
    {
       char *pS;
       float *pF;
       MinMaxI32 mm;
-      int i, j, m, n=-1, r=-1, s=-1, pad=16;
+      int i, j, m, n=-1, r=-1, s=-1;
 
       pS= (char*)(pB->w + pB->b - (b + pad));
       memset(pS+b, 0, pad);
       b= loadBuff(pS, path, b);
       if (b > 0)
       {
+         //clean(pS,b+pad);
          m= (pB->b - (b + pad)) / sizeof(*pF);
          pF= pB->p;
 
          s= skipPastSet(pS, "\r\n"); // HACKY skip header line
          //printf("imageLoadLUT() %s %p %zu %s\n", path, pS, b, pS+s);
-         m= MIN(255 * 4, m);
+         m= MIN(256 * 4, m); // prevent mysterious crash
          n= scanTableF32(pF, m, &mm, pS+s, &s, b-s);
          r= validLUT(pF,n,&mm);
          if (r > 0)

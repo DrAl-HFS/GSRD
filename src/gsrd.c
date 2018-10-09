@@ -37,7 +37,7 @@ Context *initCtx (Context * const pC, const V2U16 * const pD, U16 nF, const ArgI
 
       initParam(&(pC->pv), gKL, NULL, &(pAI->param), &sv);
 
-      initOrg(&(pC->org), w, h, 0);
+      initOrg(&(pC->org), w, h, pAI->init.flags); // & FLAG_INIT_ORG_INTERLEAVED
 
       pC->ws.b= w * h * 4 + (8<<10);
       pC->ws.b&= ~((4 << 10) - 1);
@@ -83,45 +83,60 @@ size_t loadFrame
    return(r);
 } // loadFrame
 
-void saveRGB (const HostFB * const pF)
+size_t saveRGB (const HostFB * const pF, char path[], int m, int n, const ImgOrg * const pO)
 {
-   const ImgOrg * pO= &(gCtx.org);
    U8 *pB= gCtx.ws.p;
-   char path[256];
-   int m= sizeof(path)-1, n= 0;
-   n+= snprintf(path+n, m-n, "gsrd%07luS%lux%luU8.rgb", pF->iter, pO->def.x, pO->def.y);
-   printf("saveRGB() - %s %p,%zu\n", path, gCtx.ws.p, gCtx.ws.b);
    size_t b= imageTransferRGB(pB, pF->pAB, pO, 0);
-   saveBuff(pB, path, b);
+
+   n+= snprintf(path+n, m-n, "_%lux%lu_3U8.rgb", pO->def.x, pO->def.y);
+   return saveBuff(pB, path, b);
 } // saveRGB
+
+size_t saveRaw (const HostFB * const pF, char path[], int m, int n, const ImgOrg * const pO)
+{
+   switch(pO->stride[0])
+   {
+      case 1 : n+= snprintf(path+n, m-n, "(%lu,%lu,2)", pO->def.x, pO->def.y); break;
+      default : n+= snprintf(path+n, m-n, "_%lux%lu_%d", pO->def.x, pO->def.y, pO->stride[0]); break;
+   }
+   n+= snprintf(path+n, m-n, "%s", "F64.raw");
+   return saveBuff(pF->pAB, path, sizeof(Scalar) * pO->n);
+} // saveRaw
 
 size_t saveFrame 
 (
-   const HostFB * const pFB, 
+   const HostFB * const pF, 
    const ImgOrg * const pO, 
    const ArgInfo * const pA
 )
 {
    size_t r= 0;
-   if (pFB && pFB->pAB && pO)
+   if (pF && pF->pAB && pO && pA && (pA->files.flags & FLAG_FILE_OUT))
    {
       char path[256];
-      int m= sizeof(path)-1, n= 0;
+      const int m= sizeof(path)-1;
+      int i= 0;
 
-      //if (NULL == pAI->dfi.outPath) { pAI->dfi.outPath= pAI->dfi.inPath; }
-
-      if (pA->files.outPath)
+      do
       {
-         n+= snprintf(path+n, m-n, "%s", pA->files.outPath);
-         if ('/' != path[n-1]) { path[n++]= '/'; path[n]= 0; }
-      }
-      if (pA->files.outName) { n+= snprintf(path+n, m-n, "%s", pA->files.outName); }
-      else { n+= snprintf(path+n, m-n, "%s", "gsrd"); } 
+         int n= 0;
 
-      n+= snprintf(path+n, m-n, "%07lu(%lu,%lu,2)F64.raw", pFB->iter, pO->def.x, pO->def.y);
-      r= saveBuff(pFB->pAB, path, sizeof(Scalar) * pO->n);
-      printf("saveFrame() - %s %p %zu bytes\n", path, pFB->pAB, r);
-      saveRGB(pFB);
+         //if (NULL == pAI->dfi.outPath) { pAI->dfi.outPath= pAI->dfi.inPath; }
+         if (pA->files.outPath[i])
+         {
+            n+= snprintf(path+n, m-n, "%s", pA->files.outPath[i]);
+            if ('/' != path[n-1]) { path[n++]= '/'; path[n]= 0; }
+         }
+         if (pA->files.outName) { n+= snprintf(path+n, m-n, "%s%07lu", pA->files.outName, pF->iter); }
+         else { n+= snprintf(path+n, m-n, "gsrd%07lu", pF->iter); } 
+
+         switch(pA->files.outType[i]) 
+         {
+            case 2 : r= saveRaw(pF,path,m,n,pO); break;
+            case 3 : r= saveRGB(pF,path,m,n,pO); break;
+         }
+         printf("saveFrame() - %s %p %zu bytes\n", path, pF->pAB, r);
+      } while (++i < pA->files.nOutPath);
    }
    return(r);
 } // saveFrame
