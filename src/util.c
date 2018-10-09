@@ -457,6 +457,24 @@ int scanArgs (ArgInfo *pAI, const char * const a[], int nA)
    return(nV);
 } // scanArgs
 
+void usage (void)
+{
+static char *strtab[]=
+{
+   "-A:<opt>         Acceleration - specify <opt> H G A N for Host GPU All None",
+   "-C:<path>        Comparison file path",
+   "-D:w,h           Define dimensions of simulation domain",
+   "-I:<max>,<sub>   Iterations total run duration and save interval",
+   "-L:<path>        LUT (colour map) for rgb output",
+   "-O:<path>        Output file path and inferred type",
+   "-P:<id>          Initial Pattern id",
+   "-R               Interleave (versus planar) scalar fields",
+   "-V:<>            Parameter values"
+};
+   int i, m= sizeof(strtab)/sizeof(strtab[0]);
+   for (i= 0; i < m; i++ ) { printf("%s", strtab[i]); }
+} // usage
+
 // Marsaglia MWC PRNG
 uint randMMWC (SeedMMWC *pS)
 {

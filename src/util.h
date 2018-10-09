@@ -149,6 +149,8 @@ extern int scanTableF32 (float v[], int maxV, MinMaxI32 *pW, const char str[], i
 //extern int scanVI (int v[], const int vMax, ScanSeg * const pSS, const char s[]);
 extern int scanArgs (ArgInfo * pAI, const char * const a[], int nA);
 
+extern void usage (void);
+
 extern uint randMMWC (SeedMMWC *pS);
 extern void initSeedMMWC (SeedMMWC *pS, U16 id);
 extern double randN (RandF *pRF);
