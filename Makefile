@@ -10,12 +10,12 @@ ABFLAGS = -DACC
 # Whereas INKCAP (GTX970M - "cc50") works with default...
 #ACCFLAGS = -mp -fast -acc=verystrict -ta=multicore,tesla
 #ACCFLAGS = -fast -acc=verystrict -ta=multicore,tesla
-ACCFLAGS = -g -Mautoinline -acc=verystrict -ta=multicore,tesla
+ACCFLAGS = -g -Mautoinline -acc=verystrict -ta=host,multicore,tesla
 #FAST = -O4 -Mautoinline -acc=verystrict
 #OPT = -ta=tesla:managed #ERR: malloc: call to cuMemAllocManaged returned error 3: Not initialized
 
 TARGET = gsrd
-RUNOPT = -A:A
+RUNOPT = -A:G
 RUNFLAGS = -I=100,100 -O:raw/
 DATAFILE = "init/gsrd00000(1024,1024,2)F64.raw"
 CMP_FILE = "ref/gsrd00100(1024,1024,2)F64.raw"
@@ -75,22 +75,24 @@ SRC_DIR=src
 OBJ_DIR=obj
 
 #SL = $(shell ls $(SRC_DIR))
-SL= gsrd.c proc.c data.c util.c
+SL= gsrd.c proc.c data.c util.c image.c
 SRC:= $(SL:%.c=$(SRC_DIR)/%.c)
 OBJ:= $(SL=:%.c=$(OBJ_DIR)/%.o)
 
 # Default build - no acceleration
 build: $(SRC)
-	$(CC) $(CCFLAGS) -o $(TARGET) $(SRC)
+	$(CC) $(CCFLAGS) -o $(TARGET)X $(SRC)
 
 buildacc: $(SRC)
 	$(CC) $(CCFLAGS) $(ACCFLAGS) $(ABFLAGS) -o $(TARGET) $(SRC)
 
-run: $(TARGET)
-	./$(TARGET) $(DATAFILE) -C:$(CMP_FILE) $(RUNFLAGS)
+run: $(TARGET)X
+	./$(TARGET)X -V=0.1 $(DATAFILE) -C:$(CMP_FILE) $(RUNFLAGS)
 
 runacc: $(TARGET)
-	./$(TARGET) $(DATAFILE) -C:$(CMP_FILE) $(RUNFLAGS) $(RUNOPT) 2>> log.txt
+	./$(TARGET) $(DATAFILE) -C:$(CMP_FILE) $(RUNFLAGS) $(RUNOPT)
+# ./$(TARGET) $(RUNFLAGS) $(RUNOPT)
+# 2>> log.txt
 
 verify:
 
