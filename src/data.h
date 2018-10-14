@@ -66,7 +66,7 @@ typedef struct
 // Other stuff
 typedef struct
 {
-   Stride h[6], v[6];
+   Stride h[6];//, v[6];
 } BoundaryWrap;
 
 typedef struct
@@ -74,7 +74,7 @@ typedef struct
    V2U32  def;
    Stride stride[4];
    size_t n;
-   Stride nhStepWrap[2][4]; // neighbourhood 
+   Stride nhStepWrap[2][4], hw[6]; // neighbourhood 
    BoundaryWrap wrap;
 } ImgOrg;
 

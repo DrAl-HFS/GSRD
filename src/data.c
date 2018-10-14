@@ -17,17 +17,6 @@ static void initWrap (BoundaryWrap *pW, const Stride stride[4])
    pW->h[0]= stride[1]; pW->h[1]= stride[2] - stride[1];	// 0..3 LO, 2..5 HI
    pW->h[2]= -stride[0]; pW->h[3]= stride[0];
    pW->h[4]= stride[1] - stride[2]; pW->h[5]= -stride[1];
-
-   pW->v[0]= stride[1] - stride[0]; pW->v[1]= stride[0];
-   pW->v[2]= stride[1]; pW->v[3]= -stride[1];
-   pW->v[4]= -stride[0]; pW->v[5]= stride[0] - stride[1];
-/*
-   pW->c[0]= stride[1] - stride[0]; pW->c[1]= stride[0];
-   pW->c[2]= stride[1]; pW->c[3]= stride[2] - stride[1];
-   pW->c[4]= -stride[0]; pW->c[5]= stride[0] - stride[1];
-   pW->d[0]= pW->c[0]; pW->d[1]= pW->c[1]; pW->d[4]= pW->c[4]; pW->d[5]= pW->c[5];
-   pW->d[2]= -pW->c[2]; pW->d[3]= -pW->c[3];
-*/
 } // initWrap
 
 void initOrg (ImgOrg * const pO, U16 w, U16 h, U8 flags)
@@ -60,7 +49,20 @@ void initOrg (ImgOrg * const pO, U16 w, U16 h, U8 flags)
       pO->nhStepWrap[1][2]= pO->nhStepWrap[0][2] + pO->stride[2];
       pO->nhStepWrap[1][3]= pO->nhStepWrap[0][3] + -pO->stride[2];
 
+      pO->hw[0]= pO->nhStepWrap[0][3];
+      pO->hw[1]= pO->nhStepWrap[1][2];
+      pO->hw[2]= pO->nhStepWrap[0][0];
+      pO->hw[3]= pO->nhStepWrap[0][1];
+      pO->hw[4]= pO->nhStepWrap[1][3];
+      pO->hw[5]= pO->nhStepWrap[0][2];
+
       initWrap(&(pO->wrap), pO->stride);
+      int e= 0;
+      for (int i=0; i<6; i++)
+      {
+         if (pO->wrap.h[i] != pO->hw[i]) { e++; printf("[%d] %d ?%d?\n", i, pO->wrap.h[i], pO->hw[i]); } 
+      }
+      printf("initOrg() - %d errors\n", e);
    }
 } // initOrg
 

@@ -348,8 +348,9 @@ int scanArgs (ArgInfo *pAI, const char * const a[], int nA)
 {
    const char *pCh;
    ArgInfo tmpAI;
-   int nV= 0;
+   int nV= 0, nHE= (nA <= 1);
 
+   //if (nA > 0) { printf("scanArgs() - %s\n", a[0]); }
    if (NULL == pAI) { pAI= &tmpAI; }
    while (nA-- > 0)
    {
@@ -447,9 +448,13 @@ int scanArgs (ArgInfo *pAI, const char * const a[], int nA)
                break;
 
             default : printf("scanArgs() - unknown flag -%c\n", c);
+
+            case 'H' :
+            case '?' : nHE++;
          }
       }
    }
+   if (nHE > 0) { usage(); }
    //if (0 == pAI->proc.flags) { pAI->proc.flags= PROC_FLAG_HOST|PROC_FLAG_GPU; }
    if (0 == pAI->proc.maxIter) { pAI->proc.maxIter= 5000; }
    if (0 == pAI->proc.subIter) { pAI->proc.subIter= 1000; }
@@ -461,18 +466,20 @@ void usage (void)
 {
 static char *strtab[]=
 {
-   "-A:<opt>         Acceleration - specify <opt> H G A N for Host GPU All None",
+   "-A:<H|G|A|N>     Acceleration: Host GPU All None",
    "-C:<path>        Comparison file path",
    "-D:w,h           Define dimensions of simulation domain",
-   "-I:<max>,<sub>   Iterations total run duration and save interval",
+   "-I:<max>,<sub>   Iterations max is total run duration, sub is periodic analysis/save interval",
    "-L:<path>        LUT (colour map) for rgb output",
-   "-O:<path>        Output file path and inferred type",
-   "-P:<id>          Initial Pattern id",
+   "-O:<path>        Output file path and inferred type (raw or rgb)",
+   "-P:<id>          Initial Pattern id (0=point, 1=square, 2=circle, +4=randomise)",
    "-R               Interleave (versus planar) scalar fields",
-   "-V:<>            Parameter values"
+   "-V:<#,#,#>       Parameter values for Death, Replenishment and Biomass Diffusion"
 };
    int i, m= sizeof(strtab)/sizeof(strtab[0]);
-   for (i= 0; i < m; i++ ) { printf("%s", strtab[i]); }
+   printf("Usage:\n");
+   for (i= 0; i < m; i++ ) { printf("\t%s\n", strtab[i]); }
+   printf("\n");
 } // usage
 
 // Marsaglia MWC PRNG
