@@ -5,7 +5,8 @@
 #ifndef DATA_H
 #define DATA_H
 
-#include "util.h"
+#include "args.h"
+#include "randMar.h"
 
 #define KR0  (Scalar)0.125
 #define KRA0 (Scalar)0.0115

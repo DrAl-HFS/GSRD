@@ -73,7 +73,7 @@ void clean (signed char *pS, size_t n)
    while (pS[n] < ' ') { printf("[%zu] 0x%02X\n", n, 0xFF & pS[n]); --n; }
 } // clean
 
-int imageLoadLUT (Buffer *pB, const char path[])
+int imageLoadLUT (const MemBuff *pB, const char path[])
 {
    size_t b= fileSize(path);
    int pad= 4 - (b & 0x3);
@@ -84,13 +84,13 @@ int imageLoadLUT (Buffer *pB, const char path[])
       MinMaxI32 mm;
       int i, j, m, n=-1, r=-1, s=-1;
 
-      pS= (char*)(pB->w + pB->b - (b + pad));
+      pS= (char*)(pB->w + pB->bytes - (b + pad));
       memset(pS+b, 0, pad);
       b= loadBuff(pS, path, b);
       if (b > 0)
       {
          //clean(pS,b+pad);
-         m= (pB->b - (b + pad)) / sizeof(*pF);
+         m= (pB->bytes - (b + pad)) / sizeof(*pF);
          pF= pB->p;
 
          s= skipPastSet(pS, "\r\n"); // HACKY skip header line
@@ -101,7 +101,7 @@ int imageLoadLUT (Buffer *pB, const char path[])
          if (r > 0)
          {
             ImageLUT *pL= &gLUT;
-            pL->pT= (float*)(pB->w + pB->b) - r;
+            pL->pT= (float*)(pB->w + pB->bytes) - r;
             pL->pRGBX= (RGBX*)gLUT.pT - r;
             pL->n= r;
             pL->flags= 0;

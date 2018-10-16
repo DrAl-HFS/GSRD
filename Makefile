@@ -75,7 +75,7 @@ SRC_DIR=src
 OBJ_DIR=obj
 
 #SL = $(shell ls $(SRC_DIR))
-SL= gsrd.c proc.c data.c util.c image.c
+SL= gsrd.c proc.c data.c args.c util.c randMar.c image.c
 SRC:= $(SL:%.c=$(SRC_DIR)/%.c)
 OBJ:= $(SL=:%.c=$(OBJ_DIR)/%.o)
 

@@ -66,8 +66,9 @@ typedef struct
 typedef struct
 {
    size_t bytes;
-   void  *p;
+   union { void *p; size_t w; };
 } MemBuff;
+//typedef struct { union { void *p; size_t w; }; size_t b; } Buffer; // char *p;
 
 typedef struct { U16 x, y; } V2U16;
 typedef struct { U32 x, y; } V2U32;
@@ -77,62 +78,13 @@ typedef struct { size_t min, max; } MinMaxZU;
 
 typedef struct { U16 start, len; } ScanSeg;
 
-typedef struct
-{
-   const char  *filePath;
-   size_t      bytes, iter;
-   ScanSeg     vSS;
-   int         v[4], nV;
-   V2U16       def;
-   U8          elemBits;
-   U8          flags;
-   U8          pad[2];
-} DataFileInfo;
-
-typedef struct
-{
-   DataFileInfo  init, cmp;
-   const char    *lutPath, *outName, *outPath[2];
-   U8             flags, nOutPath, outType[2];
-} FileInfo;
-
-typedef struct
-{
-   V2U16 def;
-   U8    nD, patternID;
-   U8    flags;
-   U8    pad[1];
-} InitInfo;
-
-typedef struct
-{
-   float v[3];
-   U8    nV;
-   char  id[3];
-} ParamInfo;
-
-typedef struct
-{
-   size_t   flags, maxIter, subIter;
-} ProcInfo;
-
-typedef struct
-{
-   FileInfo    files;
-   InitInfo    init;
-   ParamInfo   param;
-   ProcInfo    proc;
-} ArgInfo;
-
-typedef struct { union { void *p; size_t w; }; size_t b; } Buffer; // char *p;
-
-// Marsaglia MWC PRNG
-typedef struct { uint z, w; } SeedMMWC;
-typedef struct { float f[2]; SeedMMWC s; } RandF;
 
 /***/
 
-extern Bool32 validBuff (const Buffer *pB, size_t b);
+extern Bool32 validBuff (const MemBuff *pB, size_t b);
+
+extern const char *stripPath (const char *path);
+
 extern size_t fileSize (const char * const path);
 extern size_t loadBuff (void * const pB, const char * const path, const size_t bytes);
 extern size_t saveBuff (const void * const pB, const char * const path, const size_t bytes);
@@ -147,14 +99,5 @@ extern int scanTableF32 (float v[], int maxV, MinMaxI32 *pW, const char str[], i
 
 // extern const char *sc (const char *s, const char c, const char * const e, const I8 o);
 //extern int scanVI (int v[], const int vMax, ScanSeg * const pSS, const char s[]);
-extern int scanArgs (ArgInfo * pAI, const char * const a[], int nA);
-
-extern void usage (void);
-
-extern uint randMMWC (SeedMMWC *pS);
-extern void initSeedMMWC (SeedMMWC *pS, U16 id);
-extern double randN (RandF *pRF);
-extern void initRF (RandF *pRF, float scale, float offset, U16 sid);
-extern float randF (RandF *pRF);
 
 #endif // UTIL_H

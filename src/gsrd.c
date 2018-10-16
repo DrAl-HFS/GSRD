@@ -2,6 +2,7 @@
 // https://github.com/DrAl-HFS/GSRD.git
 // (c) GSRD Project Contributors Feb-April 2018
 
+#include "args.h"
 #include "proc.h"
 #include "image.h"
 
@@ -11,7 +12,7 @@ typedef struct
    HostBuffTab hbt;
    ImgOrg      org;
    size_t      iter;
-   Buffer      ws;
+   MemBuff     ws;
 } Context;
 
 /***/
@@ -39,9 +40,9 @@ Context *initCtx (Context * const pC, const V2U16 * const pD, U16 nF, const ArgI
 
       initOrg(&(pC->org), w, h, pAI->init.flags); // & FLAG_INIT_ORG_INTERLEAVED
 
-      pC->ws.b= w * h * 4 + (8<<10);
-      pC->ws.b&= ~((4 << 10) - 1);
-      pC->ws.p= malloc(pC->ws.b);
+      pC->ws.bytes= w * h * 4 + (8<<10);
+      pC->ws.bytes&= ~((4 << 10) - 1);
+      pC->ws.p= malloc(pC->ws.bytes);
 
       if (pAI->files.lutPath)
       { // "init/viridis-table-byte-0256.csv"
@@ -252,7 +253,7 @@ const V2U16 *selectDef (const DataFileInfo * const pIF, const InitInfo * const p
 
 int main ( int argc, char* argv[] )
 {
-   int n= 0, i= 0, nErr= 0;
+   int n= 0, i= 0, nCmp=0, nErr= 0;
    ArgInfo ai={0,};
 
    if (argc > 1)
@@ -285,6 +286,7 @@ int main ( int argc, char* argv[] )
          }
          gCtx.iter= pFrame->iter;
          //k= (gCtx.iter - pFrame->iter) & 0x1;
+         // if verbose...
          summarise(pFrame, &(gCtx.org));
          printf("---- %s ----\n", procGetCurrAccTxt(pFrame->label, sizeof(pFrame->label)-1));
          memcpy(pFrame[1].label, pFrame[0].label, sizeof(pFrame->label));
@@ -315,7 +317,7 @@ int main ( int argc, char* argv[] )
          pF2= gCtx.hbt.hfb+fIdx[1];
          pFrame=  gCtx.hbt.hfb+fIdx[0];
          //if (pFrame->iter == pF1->iter) 
-         { nErr= compare(pFrame, pF2, &(gCtx.org), 1.0/(1<<30)); }
+         { nCmp++; nErr= compare(pFrame, pF2, &(gCtx.org), 1.0/(1<<30)); }
       }
       if ((nIdx > 0) && (nIdx < 4))
       {
@@ -324,14 +326,17 @@ int main ( int argc, char* argv[] )
          if (loadFrame( pF2, &(ai.files.cmp) ))
          {
             snprintf(pF2->label, sizeof(pF2->label)-1, "CF");
+            nCmp++;
             nErr= compare(pFrame, pF2, &(gCtx.org), 1.0/(1<<10));
          }
       }
    }
    releaseCtx(&gCtx);
  
-   if ( nErr != 0 ) { printf( "Test FAILED\n"); }
-   else {printf( "Test PASSED\n"); }
-
+   if (nCmp > 0)
+   {
+      if (0 != nErr) { printf( "Test FAILED\n"); }
+      else {printf( "Test PASSED\n"); }
+   } else { printf("Complete\n"); }
    return(0);
 } // main

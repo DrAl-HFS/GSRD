@@ -10,7 +10,7 @@
 
 /***/
 
-extern int imageLoadLUT (Buffer *pB, const char path[]);
+extern int imageLoadLUT (const MemBuff *pB, const char path[]);
 
 // void initWrap (BoundaryWrap *pW, const Stride stride[4]);
 extern size_t imageTransferRGB (U8 *pRGB, const Scalar * const pAB, const ImgOrg * const pO, U32 mode);
