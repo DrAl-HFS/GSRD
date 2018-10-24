@@ -25,6 +25,7 @@ typedef struct
 
 static ImageLUT gLUT={0,};
 
+static const MinMaxF64 gDom={0,1};
 
 /***/
 
@@ -89,7 +90,7 @@ int imageLoadLUT (const MemBuff *pB, const char path[])
                pL->pRGBX[i].x= 0xFF;
                //printf("%G %u %u %u\n", pL->pT[i], pL->pRGBX[i].r, pL->pRGBX[i].g, pL->pRGBX[i].b);
             }
-            pL->lh[0].r= 0; pL->lh[0].g= 0; pL->lh[0].b= 0x8; pL->lh[0].x= 0xFF;
+            pL->lh[0].r= 0; pL->lh[0].g= 0; pL->lh[0].b= 0x08; pL->lh[0].x= 0xFF;
             pL->lh[1].r= 0xFF; pL->lh[0].g= 0xFF; pL->lh[0].b= 0xFF; pL->lh[0].x= 0xFF;
             return(r);
          }
@@ -99,15 +100,24 @@ int imageLoadLUT (const MemBuff *pB, const char path[])
    return(0);
 } // imageLoadLUT
 
-size_t imageTransferRGB (U8 *pRGB, const Scalar * const pAB, const ImgOrg * const pO, U32 mode)
+size_t imageTransferRGB (U8 *pRGB, const Scalar * const pAB, const ImgOrg * const pO,  const ImgMap * const pM)
 {
-   float a, b, w;
+   Bool32 useLUT= FALSE;
+   F32 map[2]={0,0};
+   F32 a, b;
    size_t i, k=0;
-   int j, x, y;
+   I32 j, m, x, y;
 
-   if (gLUT.pRGBX && gLUT.n > 1)
+   if (gLUT.pRGBX && (gLUT.n > 1)) { map[0]= gLUT.n; useLUT= TRUE; } else { map[0]= 0xFF; }
+   if (pM && (pM->dom.max > pM->dom.min))
+   {
+      map[0]/= (pM->dom.max - pM->dom.min);
+      map[1]= - map[0] * pM->dom.min;
+   }
+   if (useLUT)
    {
       const ImageLUT *pL= &gLUT;
+      m= pL->n - 1;
       for (y= 0; y < pO->def.y; y++)
       {
          for (x= 0; x< pO->def.x; x++)
@@ -115,15 +125,19 @@ size_t imageTransferRGB (U8 *pRGB, const Scalar * const pAB, const ImgOrg * cons
             const RGBX *pT;
 
             i= x * pO->stride[0] + y * pO->stride[1];
-            a= pAB[i]; b= pAB[i + pO->stride[3]];
+            //a= pAB[i]; 
+            b= pAB[i + pO->stride[3]];
 
-            if (a < 0) { a= 0; } else if (a > 1) { a= 1; }
+            j= b * map[0] + map[1];
 
-            if (b <= 0) { pT= pL->lh+0; }
-            else if (b >= 1) { pT= pL->lh+1; }
-            else { j= pL->n * b; pT= pL->pRGBX + j; };
+            if (j >= 0)
+            {
+               if (j > m) { j= m; }
+               pT= pL->pRGBX + j; 
+            }
+            else { pT= pL->lh+0; }
             
-            pRGB[k++]= pT->r; // + (0xFF - pT->r) * a;
+            pRGB[k++]= pT->r;
             pRGB[k++]= pT->g;
             pRGB[k++]= pT->b;
          }
@@ -136,11 +150,15 @@ size_t imageTransferRGB (U8 *pRGB, const Scalar * const pAB, const ImgOrg * cons
          for (x= 0; x< pO->def.x; x++)
          {
             i= x * pO->stride[0] + y * pO->stride[1];
-            a= pAB[i]; b= pAB[i + pO->stride[3]];
-            pRGB[k++]= a * 128;
-            w= b;//1.0 / (1.0 + exp(b)); // sigmoid
-            pRGB[k++]= w * 255;
-            pRGB[k++]= (1-w) * 255;
+            a= pAB[i]; 
+            b= pAB[i + pO->stride[3]];
+
+            j= b * map[0] + map[1];
+            if (j < 0) { j= 0; }
+            pRGB[k++]= a * 0x40;
+            //w= b;//1.0 / (1.0 + exp(-b)); // sigmoid
+            pRGB[k++]= j;
+            pRGB[k++]= 0xFF-j;
          }
       }
    }

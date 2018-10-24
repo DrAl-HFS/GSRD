@@ -84,7 +84,7 @@ size_t loadFrame
    return(r);
 } // loadFrame
 
-size_t saveRGB (const HostFB * const pF, char path[], int m, int n, const ImgOrg * const pO)
+size_t saveRGB (const HostFB * const pF, char path[], int m, int n, const ImgOrg * const pO, const ImgMap * const pM)
 {
    U8 *pB= gCtx.ws.p;
    size_t b= imageTransferRGB(pB, pF->pAB, pO, 0);
@@ -123,7 +123,8 @@ size_t saveFrame
    const HostFB   * const pF, 
    const ImgOrg   * const pO, 
    const ArgInfo  * const pA,
-   const U8       tMask
+   const ImgMap   * const pM,
+   const U8       tID
 )
 {
    size_t r= 0;
@@ -136,13 +137,13 @@ size_t saveFrame
       do
       {
          const U8 t= pA->files.outType[i];
-         if (t & tMask)
+         if ((t & 0xF0) == tID)
          {
             int n= genOutPath1(path, m, pA->files.outPath[i], pA->files.outName, pF->iter);
-            switch(t & 0x3) 
+            switch(t & 0x0F) 
             {
                case 2 : r= saveRaw(pF,path,m,n,pO); break;
-               case 3 : r= saveRGB(pF,path,m,n,pO); break;
+               case 3 : r= saveRGB(pF,path,m,n,pO,pM); break;
                default : printf("saveFrame() - t=%u\n", t);
             }
             printf("saveFrame() - %s %p %zu bytes\n", path, pF->pAB, r);
@@ -281,8 +282,8 @@ void reportSG (MinMaxF64 *pT, const F64 q, const StatG * const pSG)
 
 void postProc (const ArgInfo *pAI)
 {
-   MinMaxF64 t;
-   reportSG(&t, 0.5, &(gCtx.hbt.sg));
+   ImgMap imgMap;
+   reportSG(&(imgMap.dom), 0.5, &(gCtx.hbt.sg));
    if (FLAG_FILE_XFER & pAI->files.flags)
    {
       char path[256];
@@ -310,7 +311,7 @@ void postProc (const ArgInfo *pAI)
 
          if (scanDFI(&dfi, path) && loadFrame(pFrame, &dfi))
          {
-            saveFrame(pFrame, &(gCtx.org), pAI, 0x4);
+            saveFrame(pFrame, &(gCtx.org), pAI, &imgMap, 0x80);
          }
          i+= pAI->proc.subIter;
       } while (i <= pAI->proc.maxIter);
@@ -418,7 +419,7 @@ int main ( int argc, char* argv[] )
          if (0 == loadFrame(pFrame, pIF))  //printf("nB=%zu\n",
          {
             initHFB(pFrame, &(gCtx.org), pII->patternID);
-            saveFrame(pFrame, &(gCtx.org), &ai, 0x2);
+            saveFrame(pFrame, &(gCtx.org), &ai, NULL, 0x0);
          }
          gCtx.iter= gCtx.baseIter= pFrame->iter;
          //k= (gCtx.iter - pFrame->iter) & 0x1;
@@ -442,7 +443,7 @@ int main ( int argc, char* argv[] )
             summarise(pFrame+k, &(gCtx.hbt.sg), &(gCtx.org));
             printf("\ttE= %G, %G\n", tE0, tE1);
 
-            saveFrame(pFrame+k, &(gCtx.org), &ai, 0x2);
+            saveFrame(pFrame+k, &(gCtx.org), &ai, NULL, 0x0);
          } while (gCtx.iter < pPI->maxIter);
          fprintf(stderr,"%s\t%zu\t%zu\t%G\n", pFrame->label, pPI->maxIter, pPI->subIter, tE1);
          if (nIdx < 4) { fIdx[nIdx++]= afb+k; }
