@@ -11,7 +11,7 @@ typedef struct
    ParamVal    pv;
    HostBuffTab hbt;
    ImgOrg      org;
-   size_t      iter;
+   size_t      iter, baseIter;
    MemBuff     ws;
 } Context;
 
@@ -71,8 +71,8 @@ void releaseCtx (Context * const pC)
 
 size_t loadFrame 
 (
-   HostFB               * const pFB, 
-   const DataFileInfo   * const pDFI
+   HostFB              * const pFB, 
+   const DataFileInfo * const pDFI
 )
 {
    size_t r= 0;
@@ -104,39 +104,49 @@ size_t saveRaw (const HostFB * const pF, char path[], int m, int n, const ImgOrg
    return saveBuff(pF->pAB, path, sizeof(Scalar) * pO->n);
 } // saveRaw
 
+I32 genOutPath1 (char s[], const I32 m, const char path[], const char name[], const size_t i)
+{
+   I32 n= 0;
+
+   if (path)
+   {
+      n+= snprintf(s+n, m-n, "%s", path);
+      if (('/' != s[n-1]) && ((m-n) > 2)) { s[n++]= '/'; s[n]= 0; }
+   }
+   if (name) { n+= snprintf(s+n, m-n, "%s%07lu", name, i); }
+   else { n+= snprintf(s+n, m-n, "gsrd%07lu", i); } 
+   return(n);
+} // genOutPath1
+
 size_t saveFrame 
 (
    const HostFB   * const pF, 
    const ImgOrg   * const pO, 
-   const ArgInfo  * const pA
+   const ArgInfo  * const pA,
+   const U8       tMask
 )
 {
    size_t r= 0;
    if (pF && pF->pAB && pO && pA && (pA->files.flags & FLAG_FILE_OUT))
    {
       char path[256];
-      const int m= sizeof(path)-1;
-      int i= 0;
+      const I32 m= sizeof(path)-1;
+      I32 i= 0;
 
       do
       {
-         int n= 0;
-
-         //if (NULL == pAI->dfi.outPath) { pAI->dfi.outPath= pAI->dfi.inPath; }
-         if (pA->files.outPath[i])
+         const U8 t= pA->files.outType[i];
+         if (t & tMask)
          {
-            n+= snprintf(path+n, m-n, "%s", pA->files.outPath[i]);
-            if ('/' != path[n-1]) { path[n++]= '/'; path[n]= 0; }
+            int n= genOutPath1(path, m, pA->files.outPath[i], pA->files.outName, pF->iter);
+            switch(t & 0x3) 
+            {
+               case 2 : r= saveRaw(pF,path,m,n,pO); break;
+               case 3 : r= saveRGB(pF,path,m,n,pO); break;
+               default : printf("saveFrame() - t=%u\n", t);
+            }
+            printf("saveFrame() - %s %p %zu bytes\n", path, pF->pAB, r);
          }
-         if (pA->files.outName) { n+= snprintf(path+n, m-n, "%s%07lu", pA->files.outName, pF->iter); }
-         else { n+= snprintf(path+n, m-n, "gsrd%07lu", pF->iter); } 
-
-         switch(pA->files.outType[i]) 
-         {
-            case 2 : r= saveRaw(pF,path,m,n,pO); break;
-            case 3 : r= saveRGB(pF,path,m,n,pO); break;
-         }
-         printf("saveFrame() - %s %p %zu bytes\n", path, pF->pAB, r);
       } while (++i < pA->files.nOutPath);
    }
    return(r);
@@ -226,7 +236,7 @@ size_t findMaxHZ (const size_t h[], const size_t n)
    return(m);
 } // findMaxHZ
 
-void reportSG (const StatG * const pSG)
+void reportSG (MinMaxF64 *pT, const F64 q, const StatG * const pSG)
 {
    FSFmt fmt;
 
@@ -241,60 +251,71 @@ void reportSG (const StatG * const pSG)
 
    if (pSG->hB.pH)
    {
-      size_t i, m, t, *pA= NULL;
+      size_t i, m, t;
       Scalar f= 0, s= 0;
 
-      if (validBuff(&(gCtx.ws), pSG->mb.bytes))
+      t= sumNZU(pSG->hB.pH, pSG->hB.nH);
+      if (t > 0)
       {
-         pA= gCtx.ws.p;
-         t= accumNZU(pA, pSG->hB.pH, pSG->hB.nH);
-         if (t > 0)
-         {
-            s= 1.0 / t;
-            // estimate median
-            m= t / 2;
-            i= findQHZ(&f, pSG->hB.pH, pSG->hB.nH, m);
-            /*
-            printf("findQHZ() - %zu %G\n", i, f);
-            i= 0;
-            while ((i < pSG->hB.nH) && (pA[i] < m)) { ++i; }
-            printf("m=%zu, [%zu] H=%zu A=%zu\n", m, i, pSG->hB.pH[i], pA[i]);
-            if ((i < pSG->hB.nH) && (pSG->hB.pH[i] > 0) && (pA[i] > m))
-            {
-               size_t a= 0;
-               if (i > 0) { a= pA[i-1]; }
-               f= (double)(m - a) / pSG->hB.pH[i];
-            }
-            f+= i;
-            */
-            printf("Median [%zu] (%G) %G\n\n", i, f, f * pSG->rMap[0] + pSG->rMap[1] );
-            t= i + findTailHZ(pSG->hB.pH+i, pSG->hB.nH-i, 2, 3);
-            f= t;
-            printf("Tail [%zu]=%zu %G\n\n", t, pSG->hB.pH[t], f * pSG->rMap[0] + pSG->rMap[1] );
-            {
-               size_t a= MAX(0, t-10);
-               size_t b= MIN(pSG->hB.nH-1, t+10);
-               for (i=a; i <= b; i++) { printf("[%zu]= %zu\n", i, pSG->hB.pH[i] ); }
-               printf("\n");
-            }
-            //for (i=t; i < pSG->hB.nH; i++) { printf(" %zu", pSG->hB.pH[i] ); }
-            //printf("\n\n");
-            //f= i= findMaxHZ(pSG->hB.pH, pSG->hB.nH);
-            //if (i < pSG->hB.nH) { f= i; } else { f= -1; }
-            //printf("Mode [%zu] (%G) %G\n\n", i, f, f * pSG->rMap[0] + pSG->rMap[1] );
-
-         }
-      }
+         s= 1.0 / t;
+         // estimate median
+         m= t / 2;
+         i= findQHZ(&f, pSG->hB.pH, pSG->hB.nH, t * q);
+         pT->min= f * pSG->rMap[0] + pSG->rMap[1];
+         printf("Q%G [%zu] (%G) %G\n\n", q, i, f, pT->min);
+         t= i + findTailHZ(pSG->hB.pH+i, pSG->hB.nH-i, 2, 3);
+         f= t;
+         pT->max= f * pSG->rMap[0] + pSG->rMap[1];
+         printf("Tail [%zu]=%zu %G\n\n", t, pSG->hB.pH[t], pT->max);
 #if 0
-      printf("hB[%zu]:", pSG->hB.nH);
-      for (i= 0; i < pSG->hB.nH; i++)
-      {
-         printf(" %G", pSG->hB.pH[i] * s);
-      }
-      printf("\n\n");
+         {  // TODO: check for anomalies...
+            size_t a= MAX(0, t-10);
+            size_t b= MIN(pSG->hB.nH-1, t+10);
+            for (i=a; i <= b; i++) { printf("[%zu]= %zu\n", i, pSG->hB.pH[i] ); }
+            printf("\n");
+         }
 #endif
+      }
    }
 } // reportSG
+
+void postProc (const ArgInfo *pAI)
+{
+   MinMaxF64 t;
+   reportSG(&t, 0.5, &(gCtx.hbt.sg));
+   if (FLAG_FILE_XFER & pAI->files.flags)
+   {
+      char path[256];
+      const char *pOP=NULL;
+      const I32 m= sizeof(path)-1;
+      DataFileInfo dfi;
+      HostFB *pFrame= gCtx.hbt.hfb+0;
+      size_t i;
+
+      memset(&dfi, 0, sizeof(dfi));
+      dfi.filePath= path;
+      {
+         U8 j=0;
+         while ((NULL == pOP) && (j < pAI->files.nOutPath))
+         {
+            if (2 == pAI->files.outType[j]) { pOP= pAI->files.outPath[j]; }
+            j++;
+         }
+      }
+      i= gCtx.baseIter;
+      do
+      {
+         I32 n= genOutPath1(path, m, pOP, pAI->files.outName, i);
+         n+= snprintf(path+n, m-n, "(%lu,%lu,2)F64.raw", gCtx.org.def.x, gCtx.org.def.y);
+
+         if (scanDFI(&dfi, path) && loadFrame(pFrame, &dfi))
+         {
+            saveFrame(pFrame, &(gCtx.org), pAI, 0x4);
+         }
+         i+= pAI->proc.subIter;
+      } while (i <= pAI->proc.maxIter);
+   }
+} // postProc
 
 typedef struct { size_t s, e; } IdxSpan;
 #define MAX_TAB_IS 32
@@ -397,9 +418,9 @@ int main ( int argc, char* argv[] )
          if (0 == loadFrame(pFrame, pIF))  //printf("nB=%zu\n",
          {
             initHFB(pFrame, &(gCtx.org), pII->patternID);
-            saveFrame(pFrame, &(gCtx.org), &ai);
+            saveFrame(pFrame, &(gCtx.org), &ai, 0x2);
          }
-         gCtx.iter= pFrame->iter;
+         gCtx.iter= gCtx.baseIter= pFrame->iter;
          //k= (gCtx.iter - pFrame->iter) & 0x1;
          // if verbose...
          summarise(pFrame, NULL, &(gCtx.org)); // ignore initial dist. &(gCtx.hbt.sg)
@@ -421,13 +442,12 @@ int main ( int argc, char* argv[] )
             summarise(pFrame+k, &(gCtx.hbt.sg), &(gCtx.org));
             printf("\ttE= %G, %G\n", tE0, tE1);
 
-            saveFrame(pFrame+k, &(gCtx.org), &ai);
+            saveFrame(pFrame+k, &(gCtx.org), &ai, 0x2);
          } while (gCtx.iter < pPI->maxIter);
          fprintf(stderr,"%s\t%zu\t%zu\t%G\n", pFrame->label, pPI->maxIter, pPI->subIter, tE1);
          if (nIdx < 4) { fIdx[nIdx++]= afb+k; }
          afb+= 2;
       } while (procSetNextAcc(PROC_NOWRAP));
-      reportSG(&(gCtx.hbt.sg));
       if (nIdx > 1)
       {
          pF2= gCtx.hbt.hfb+fIdx[1];
@@ -446,6 +466,7 @@ int main ( int argc, char* argv[] )
             nErr= compare(pFrame, pF2, &(gCtx.org), 1.0/(1<<10));
          }
       }
+      postProc(&ai);
    }
    releaseCtx(&gCtx);
  

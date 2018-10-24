@@ -471,7 +471,7 @@ Bool32 procInitAcc (size_t f) // arg param ?
    gDev.iHost= -1;
    if ((nH > 0) && (f & PROC_FLAG_ACCHOST))
    {
-      int v[2]=0;
+      I32 v[2]=0;
       scanEnvID(v+0, 1, "ACC_NUM_CORES");
       scanEnvID(v+1, 1, "OMP_NUM_THREADS");
       printf("\tH: C%d T%d id=%d\n", v[0], v[1], acc_get_device_num(acc_device_host));

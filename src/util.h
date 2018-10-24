@@ -38,13 +38,6 @@
 #define FALSE (0)
 #endif
 
-#define DFI_FLAG_VALIDATED (1<<0)
-
-#define FLAG_INIT_ORG_INTERLEAVED   (1<<0)
-#define FLAG_FILE_LUT  (1<<1)
-#define FLAG_FILE_OUT  (1<<0)
-
-
 typedef int Bool32;
 
 typedef signed char  I8;
@@ -55,7 +48,10 @@ typedef unsigned char  U8;
 typedef unsigned short U16;
 typedef unsigned long  U32;
 
-typedef double SMVal; // Stat measure value
+typedef float F32;
+typedef double F64;
+
+typedef double SMVal; // Stat measure value - use widest available IEEE type
 typedef struct
 {
    SMVal    m[3];
@@ -83,6 +79,7 @@ typedef struct { U32 x, y; } V2U32;
 typedef struct { I32 min, max; } MinMaxI32;
 typedef struct { U32 min, max; } MinMaxU32;
 typedef struct { size_t min, max; } MinMaxZU;
+typedef struct { F64 min, max; } MinMaxF64;
 
 typedef struct { U16 start, len; } ScanSeg;
 
@@ -100,18 +97,18 @@ extern size_t saveBuff (const void * const pB, const char * const path, const si
 extern SMVal deltaT (void);
 extern U32 statGetRes1 (StatRes1 * const pR, const StatMom * const pS, const SMVal dof);
 
-extern int scanEnvID (int v[], int max, const char *id);
+extern I32 scanEnvID (I32 v[], I32 max, const char *id);
 
-extern int charInSet (const char c, const char set[]);
-extern int skipSet (const char s[], const char set[]);
-extern int skipPastSet (const char str[], const char set[]);
+extern I32 charInSet (const char c, const char set[]);
+extern I32 skipSet (const char s[], const char set[]);
+extern I32 skipPastSet (const char str[], const char set[]);
 
-extern int scanNI32 (int v[], const int maxV, const char str[], int *pNS, const char skip[], const char end[]);
-extern int scanNF32 (float v[], const int maxV, const char str[], int *pNS, const char skip[], const char end[]);
-extern int scanTableF32 (float v[], int maxV, MinMaxI32 *pW, const char str[], int *pNS, const int maxS);
+extern I32 scanNI32 (I32 v[], const I32 maxV, const char str[], I32 *pNS, const char skip[], const char end[]);
+extern I32 scanNF32 (F32 v[], const I32 maxV, const char str[], I32 *pNS, const char skip[], const char end[]);
+extern I32 scanTableF32 (F32 v[], I32 maxV, MinMaxI32 *pW, const char str[], I32 *pNS, const I32 maxS);
 
 extern size_t sumNZU (const size_t z[], const size_t n);
 extern size_t accumNZU (size_t a[], const size_t z[], const size_t n);
-extern double scaleFNZU (double f[], const size_t z[], const size_t n, const double s);
+extern double scaleFNZU (F64 f[], const size_t z[], const size_t n, const F64 s);
 
 #endif // UTIL_H

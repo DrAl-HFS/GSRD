@@ -53,9 +53,9 @@ int imageLoadLUT (const MemBuff *pB, const char path[])
    if ((b > 0) && validBuff(pB, b + pad)) 
    {
       char *pS;
-      float *pF;
+      F32 *pF;
       MinMaxI32 mm;
-      int i, j, m, n=-1, r=-1, s=-1;
+      I32 i, j, m, n=-1, r=-1, s=-1;
 
       pS= (char*)(pB->w + pB->bytes - (b + pad));
       memset(pS+b, 0, pad);

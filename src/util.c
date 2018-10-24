@@ -93,9 +93,9 @@ U32 statGetRes1 (StatRes1 * const pR, const StatMom * const pS, const SMVal dof)
    return(o);
 } // statGetRes1
 
-int scanEnvID (int v[], int max, const char *id)
+I32 scanEnvID (I32 v[], I32 max, const char *id)
 {
-   int n= 0;
+   I32 n= 0;
    if (id && (max > 0))
    {
       char *pCh= getenv(id);
@@ -117,31 +117,31 @@ int scanEnvID (int v[], int max, const char *id)
    return(n);
 } // scanEnvID
 
-int charInSet (const char c, const char set[])
+I32 charInSet (const char c, const char set[])
 {
-   int i= 0;
+   I32 i= 0;
    while (set[i] && (set[i] != c)) { ++i; }
    return(c == set[i]);
 } // charInSet
  
-int skipSet (const char s[], const char set[])
+I32 skipSet (const char s[], const char set[])
 {
-   int i= 0;
+   I32 i= 0;
    while (charInSet(s[i], set)) { ++i; }
    return(i);
 } // skipSet
 
-int skipPastSet (const char str[], const char set[])
+I32 skipPastSet (const char str[], const char set[])
 {
-   int i= 0;
+   I32 i= 0;
    while (str[i] && !charInSet(str[i], set)) { ++i; }
    while (charInSet(str[i], set)) { ++i; }
    return(i);
 } // skipPastSet
 
-int scanNI32 (int v[], const int maxV, const char str[], int *pNS, const char skip[], const char end[])
+I32 scanNI32 (I32 v[], const I32 maxV, const char str[], I32 *pNS, const char skip[], const char end[])
 {
-   int s, nS=0, nV= 0;
+   I32 s, nS=0, nV= 0;
    if (maxV > 0)
    {
       const char *pE= str;
@@ -161,9 +161,9 @@ int scanNI32 (int v[], const int maxV, const char str[], int *pNS, const char sk
    return(nV);
 } // scanNI32
 
-int scanNF32 (float v[], const int maxV, const char str[], int *pNS, const char skip[], const char end[])
+I32 scanNF32 (F32 v[], const I32 maxV, const char str[], I32 *pNS, const char skip[], const char end[])
 {
-   int s, nS=0, nV= 0;
+   I32 s, nS=0, nV= 0;
    if (maxV > 0)
    {
       const char *pE=str;
@@ -184,10 +184,10 @@ int scanNF32 (float v[], const int maxV, const char str[], int *pNS, const char 
    return(nV);
 } // scanNF32
 
-int scanTableF32 (float v[], int maxV, MinMaxI32 *pW, const char str[], int *pNS, const int maxS)
+I32 scanTableF32 (F32 v[], I32 maxV, MinMaxI32 *pW, const char str[], I32 *pNS, const I32 maxS)
 {
    MinMaxI32 w;
-   int nV=0, nS=0, s, n, i=0;
+   I32 nV=0, nS=0, s, n, i=0;
 
    n= scanNF32(v, maxV-nV, str+nS, &s, ",", "\r\n");
    if (n > 0)
@@ -232,7 +232,7 @@ size_t accumNZU (size_t a[], const size_t z[], const size_t n)
    return(t);
 } // accumNZU
 
-double scaleFNZU (double f[], const size_t z[], const size_t n, const double s)
+F64 scaleFNZU (F64 f[], const size_t z[], const size_t n, const F64 s)
 {
    double t= 0;
    for (size_t i= 0; i<n; i++) { t+= f[i]= s * z[i]; }
