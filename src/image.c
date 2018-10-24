@@ -1,39 +1,12 @@
 // image.c - Gray-Scott Reaction-Diffusion using OpenACC
 // https://github.com/DrAl-HFS/GSRD.git
 // (c) GSRD Project Contributors Feb-April 2018
+// image.c - Gray-Scott Reaction-Diffusion using OpenACC
+// https://github.com/DrAl-HFS/GSRD.git
+// (c) GSRD Project Contributors Feb-October 2018
 
 #include "image.h"
 
-/*
-typedef struct
-{
-   V2U32  def;
-   Stride stride[4];
-   size_t n;
-   Stride nhStepWrap[2][4]; // neighbourhood 
-   BoundaryWrap wrap;
-} ImgOrg;
-
-typedef struct
-{
-   Scalar   min, max;
-   size_t   n;
-   StatMom  s;
-} FieldStat;
-
-typedef struct
-{
-   FieldStat a[2], b[2];
-} BlockStat;
-
-typedef struct
-{
-   Scalar      *pAB;
-   BlockStat   s;
-   size_t      iter;
-   char        label[8];
-} HostFB;
-*/
 typedef struct
 {
    U8 r,g,b,x;
@@ -173,3 +146,29 @@ size_t imageTransferRGB (U8 *pRGB, const Scalar * const pAB, const ImgOrg * cons
    }
    return(k);
 } // imageTransferRGB
+
+size_t sfFromMap
+(
+   Scalar * const pAB, 
+   const ImgOrg * const pO, 
+   const U8 *pM, 
+   const ScalAB vSAB[], 
+   const int maxSAB
+)
+{
+   size_t i, k=0;
+   int x, y;
+
+   for (y= 0; y < pO->def.y; y++)
+   {
+      for (x= 0; x< pO->def.x; x++)
+      {
+         U8 m= pM[k++];
+         m= MIN(m, maxSAB);
+         i= x * pO->stride[0] + y * pO->stride[1];
+         pAB[i]= vSAB[m].a;
+         pAB[i + pO->stride[3]]= vSAB[m].b;
+      }
+   }
+   return(k);
+} // sfFromMap

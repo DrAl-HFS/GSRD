@@ -38,7 +38,7 @@ Context *initCtx (Context * const pC, const V2U16 * const pD, U16 nF, const ArgI
 
       initParam(&(pC->pv), gKL, NULL, &(pAI->param), &sv);
 
-      initOrg(&(pC->org), w, h, pAI->init.flags); // & FLAG_INIT_ORG_INTERLEAVED
+      initOrg(&(pC->org), w, h, pAI->init.flags);
 
       pC->ws.bytes= w * h * 4 + (8<<10);
       pC->ws.bytes&= ~((4 << 10) - 1);
@@ -49,7 +49,7 @@ Context *initCtx (Context * const pC, const V2U16 * const pD, U16 nF, const ArgI
          imageLoadLUT(&(pC->ws), pAI->files.lutPath);
       }
 
-      if (initHBT(&(pC->hbt), b2F, nF))
+      if (initHBT(&(pC->hbt), b2F, nF, 1<<8))
       {
          pC->iter= 0;
          return(pC);
@@ -72,7 +72,7 @@ void releaseCtx (Context * const pC)
 size_t loadFrame 
 (
    HostFB               * const pFB, 
-   const DataFileInfo  * const pDFI
+   const DataFileInfo   * const pDFI
 )
 {
    size_t r= 0;
@@ -106,9 +106,9 @@ size_t saveRaw (const HostFB * const pF, char path[], int m, int n, const ImgOrg
 
 size_t saveFrame 
 (
-   const HostFB * const pF, 
-   const ImgOrg * const pO, 
-   const ArgInfo * const pA
+   const HostFB   * const pF, 
+   const ImgOrg   * const pO, 
+   const ArgInfo  * const pA
 )
 {
    size_t r= 0;
@@ -142,14 +142,16 @@ size_t saveFrame
    return(r);
 } // saveFrame
 
-void frameStat (BlockStat * const pS, const Scalar * const pAB, const ImgOrg * const pO)
+void frameStat (BlockStat * const pS, StatG * const pSG, const Scalar * const pAB, const ImgOrg * const pO)
 {
    const size_t n= pO->def.x * pO->def.y; // pO->n / 2
    const Scalar * const pA= pAB;
    const Scalar * const pB= pAB + pO->stride[3];
    BlockStat s;
-   size_t i;
+   size_t i, k, hb=0, *pHB= &hb;
+   Scalar map[2]={0,0};
 
+   if (pSG && pSG->hB.pH && (pSG->hB.nH > 0)) { map[0]= pSG->hMap[0]; map[1]= pSG->hMap[1]; pHB= pSG->hB.pH; }
    initNFS(s.a+0, 2, NULL, 1); // KLUDGY
    initNFS(s.b+0, 2, NULL, 1);
    
@@ -161,16 +163,23 @@ void frameStat (BlockStat * const pS, const Scalar * const pAB, const ImgOrg * c
 
       statAdd(s.a + (a <= 0), a);
       statAdd(s.b + (b <= 0), b);
+      k= b * map[0] + map[1];
+      pHB[k]++;
    }
    if (pS) { *pS= s; }
+   if (pSG)
+   {
+      statMerge(&(pSG->fsA), &(pSG->fsA), s.a+0); 
+      statMerge(&(pSG->fsB), &(pSG->fsB), s.b+0); 
+   }
 } // frameStat
 
-void summarise (HostFB * const pF, const ImgOrg * const pO)
+void summarise (HostFB * const pF, StatG * const pSG, const ImgOrg * const pO)
 {
    const size_t n= pO->def.x * pO->def.y; // pO->n / 2
    FSFmt fmt;
 
-   frameStat(&(pF->s), pF->pAB, pO);
+   frameStat(&(pF->s), pSG, pF->pAB, pO);
 
    printf("summarise() - \n\t%zu  N min max sum mean var\n", pF->iter);
    fmt.pFtr= "\n"; fmt.pSep= " | <=0 ";
@@ -180,6 +189,112 @@ void summarise (HostFB * const pF, const ImgOrg * const pO)
    fmt.pHdr= "\tB: "; 
    printNFS(pF->s.b, 2, &fmt);
 } // summarise
+
+size_t findQHZ (double *pF, const size_t h[], const size_t nH, const size_t q)
+{
+   size_t i= 0, t= h[0];
+   while ((i < nH) && (t < q)) { t+= h[++i]; } //printf("%zu ", t); }
+   if (pF)
+   {
+      double f= 0.0;
+      if ((i < nH) && (h[i] > 0))
+      {
+         //printf("findQHZ() %zu %zu %zu\n", q, t, h[i]);
+         f= (double)(q - (t - h[i])) / h[i];
+      }
+      *pF= f + i;
+   }
+   return(i);
+} // findQHZ
+
+size_t findTailHZ (const size_t h[], const size_t nH, const size_t mT, const size_t nT)
+{
+   size_t i= 0, t= 0;
+   do
+   {
+      while ((i < nH) && (h[i] > mT)) { ++i; }
+      while ((i < nH) && (h[i] <= mT) && (t < nT)) { ++i; ++t; }
+   } while ((i < nH) && (t < nT));
+   if (t < nT) return(-1);
+   return(i-nT);
+} // findTailHZ
+
+size_t findMaxHZ (const size_t h[], const size_t n)
+{
+   size_t i= 0, m= 0;
+   while (++i < n) { if (h[i] > h[m]) { m= i; } }
+   return(m);
+} // findMaxHZ
+
+void reportSG (const StatG * const pSG)
+{
+   FSFmt fmt;
+
+   printf("reportSG() - \n\t  N min max sum mean var\n");
+   fmt.pFtr= "\n"; fmt.pSep= " | <=0 ";
+   fmt.limPer.min= -1; fmt.limPer.max= -1; fmt.sPer= 0.0;
+   //if (pSG->fsB.n > 0) { fmt.sPer= 100.0 / pSG->fsB.n; } 
+   fmt.pHdr= "\tA: "; 
+   printNFS(&(pSG->fsA), 1, &fmt);
+   fmt.pHdr= "\tB: "; 
+   printNFS(&(pSG->fsB), 1, &fmt);
+
+   if (pSG->hB.pH)
+   {
+      size_t i, m, t, *pA= NULL;
+      Scalar f= 0, s= 0;
+
+      if (validBuff(&(gCtx.ws), pSG->mb.bytes))
+      {
+         pA= gCtx.ws.p;
+         t= accumNZU(pA, pSG->hB.pH, pSG->hB.nH);
+         if (t > 0)
+         {
+            s= 1.0 / t;
+            // estimate median
+            m= t / 2;
+            i= findQHZ(&f, pSG->hB.pH, pSG->hB.nH, m);
+            /*
+            printf("findQHZ() - %zu %G\n", i, f);
+            i= 0;
+            while ((i < pSG->hB.nH) && (pA[i] < m)) { ++i; }
+            printf("m=%zu, [%zu] H=%zu A=%zu\n", m, i, pSG->hB.pH[i], pA[i]);
+            if ((i < pSG->hB.nH) && (pSG->hB.pH[i] > 0) && (pA[i] > m))
+            {
+               size_t a= 0;
+               if (i > 0) { a= pA[i-1]; }
+               f= (double)(m - a) / pSG->hB.pH[i];
+            }
+            f+= i;
+            */
+            printf("Median [%zu] (%G) %G\n\n", i, f, f * pSG->rMap[0] + pSG->rMap[1] );
+            t= i + findTailHZ(pSG->hB.pH+i, pSG->hB.nH-i, 2, 3);
+            f= t;
+            printf("Tail [%zu]=%zu %G\n\n", t, pSG->hB.pH[t], f * pSG->rMap[0] + pSG->rMap[1] );
+            {
+               size_t a= MAX(0, t-10);
+               size_t b= MIN(pSG->hB.nH-1, t+10);
+               for (i=a; i <= b; i++) { printf("[%zu]= %zu\n", i, pSG->hB.pH[i] ); }
+               printf("\n");
+            }
+            //for (i=t; i < pSG->hB.nH; i++) { printf(" %zu", pSG->hB.pH[i] ); }
+            //printf("\n\n");
+            //f= i= findMaxHZ(pSG->hB.pH, pSG->hB.nH);
+            //if (i < pSG->hB.nH) { f= i; } else { f= -1; }
+            //printf("Mode [%zu] (%G) %G\n\n", i, f, f * pSG->rMap[0] + pSG->rMap[1] );
+
+         }
+      }
+#if 0
+      printf("hB[%zu]:", pSG->hB.nH);
+      for (i= 0; i < pSG->hB.nH; i++)
+      {
+         printf(" %G", pSG->hB.pH[i] * s);
+      }
+      printf("\n\n");
+#endif
+   }
+} // reportSG
 
 typedef struct { size_t s, e; } IdxSpan;
 #define MAX_TAB_IS 32
@@ -287,7 +402,7 @@ int main ( int argc, char* argv[] )
          gCtx.iter= pFrame->iter;
          //k= (gCtx.iter - pFrame->iter) & 0x1;
          // if verbose...
-         summarise(pFrame, &(gCtx.org));
+         summarise(pFrame, NULL, &(gCtx.org)); // ignore initial dist. &(gCtx.hbt.sg)
          printf("---- %s ----\n", procGetCurrAccTxt(pFrame->label, sizeof(pFrame->label)-1));
          memcpy(pFrame[1].label, pFrame[0].label, sizeof(pFrame->label));
          do
@@ -303,7 +418,7 @@ int main ( int argc, char* argv[] )
             k= (gCtx.iter - pFrame->iter) & 0x1;
             pFrame[k].iter= gCtx.iter;
 
-            summarise(pFrame+k, &(gCtx.org));
+            summarise(pFrame+k, &(gCtx.hbt.sg), &(gCtx.org));
             printf("\ttE= %G, %G\n", tE0, tE1);
 
             saveFrame(pFrame+k, &(gCtx.org), &ai);
@@ -312,6 +427,7 @@ int main ( int argc, char* argv[] )
          if (nIdx < 4) { fIdx[nIdx++]= afb+k; }
          afb+= 2;
       } while (procSetNextAcc(PROC_NOWRAP));
+      reportSG(&(gCtx.hbt.sg));
       if (nIdx > 1)
       {
          pF2= gCtx.hbt.hfb+fIdx[1];

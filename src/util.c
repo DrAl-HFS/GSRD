@@ -93,6 +93,30 @@ U32 statGetRes1 (StatRes1 * const pR, const StatMom * const pS, const SMVal dof)
    return(o);
 } // statGetRes1
 
+int scanEnvID (int v[], int max, const char *id)
+{
+   int n= 0;
+   if (id && (max > 0))
+   {
+      char *pCh= getenv(id);
+      if (pCh && *pCh)
+      {
+         size_t t;
+         int nCh= 0;
+         do
+         {
+            nCh= scanZD(&t, pCh);
+            if (nCh > 0)
+            {
+               pCh+= nCh;
+               v[n++]= (int)t;
+            }
+         } while ((nCh>0) && *pCh && (n < max));
+      }
+   }
+   return(n);
+} // scanEnvID
+
 int charInSet (const char c, const char set[])
 {
    int i= 0;
@@ -194,32 +218,26 @@ int scanTableF32 (float v[], int maxV, MinMaxI32 *pW, const char str[], int *pNS
    return(nV);
 } // scanTableF32
 
-
-
-int scanEnvID (int v[], int max, const char *id)
+size_t sumNZU (const size_t z[], const size_t n)
 {
-   int n= 0;
-   if (id && (max > 0))
-   {
-      char *pCh= getenv(id);
-      if (pCh && *pCh)
-      {
-         size_t t;
-         int nCh= 0;
-         do
-         {
-            nCh= scanZD(&t, pCh);
-            if (nCh > 0)
-            {
-               pCh+= nCh;
-               v[n++]= (int)t;
-            }
-         } while ((nCh>0) && *pCh && (n < max));
-      }
-   }
-   return(n);
-} // scanEnvID
+   size_t t= 0;
+   for (size_t i= 0; i<n; i++) { t+= z[i]; }
+   return(t);
+} // sumNZU
 
+size_t accumNZU (size_t a[], const size_t z[], const size_t n)
+{
+   size_t t= 0;
+   for (size_t i= 0; i<n; i++) { a[i]= t+= z[i]; }
+   return(t);
+} // accumNZU
+
+double scaleFNZU (double f[], const size_t z[], const size_t n, const double s)
+{
+   double t= 0;
+   for (size_t i= 0; i<n; i++) { t+= f[i]= s * z[i]; }
+   return(t);
+} // scaleFNZU
 
 #ifdef UTIL_TEST
 

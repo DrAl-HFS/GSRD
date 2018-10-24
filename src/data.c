@@ -19,13 +19,13 @@ static void initWrap (BoundaryWrap *pW, const Stride stride[4])
    pW->h[4]= stride[1] - stride[2]; pW->h[5]= -stride[1];
 } // initWrap
 
-void initOrg (ImgOrg * const pO, U16 w, U16 h, U8 flags)
+void initOrg (ImgOrg * const pO, const U16 w, const U16 h, const U8 flags)
 {
    if (pO)
    {
       pO->def.x= w;
       pO->def.y= h;
-      if (0 == (flags & 1))
+      if (0 == (flags & FLAG_INIT_ORG_INTERLEAVED))
       {  // planar
          pO->stride[0]= 1;     // next element, same phase
          pO->stride[3]= w * h; // same element, next phase
@@ -44,10 +44,20 @@ void initOrg (ImgOrg * const pO, U16 w, U16 h, U8 flags)
       pO->nhStepWrap[0][2]= -pO->stride[1];
       pO->nhStepWrap[0][3]= pO->stride[1];
 
-      pO->nhStepWrap[1][0]= pO->nhStepWrap[0][0] + pO->stride[1];
-      pO->nhStepWrap[1][1]= pO->nhStepWrap[0][1] + -pO->stride[1];
-      pO->nhStepWrap[1][2]= pO->nhStepWrap[0][2] + pO->stride[2];
-      pO->nhStepWrap[1][3]= pO->nhStepWrap[0][3] + -pO->stride[2];
+      if (flags & FLAG_INIT_BOUND_REFLECT)
+      {
+         pO->nhStepWrap[1][0]= 0;
+         pO->nhStepWrap[1][1]= 0;
+         pO->nhStepWrap[1][2]= 0;
+         pO->nhStepWrap[1][3]= 0;
+      }
+      else
+      {
+         pO->nhStepWrap[1][0]= pO->nhStepWrap[0][0] + pO->stride[1];
+         pO->nhStepWrap[1][1]= pO->nhStepWrap[0][1] + -pO->stride[1];
+         pO->nhStepWrap[1][2]= pO->nhStepWrap[0][2] + pO->stride[2];
+         pO->nhStepWrap[1][3]= pO->nhStepWrap[0][3] + -pO->stride[2];
+      }
 
       pO->hw[0]= pO->nhStepWrap[0][3];
       pO->hw[1]= pO->nhStepWrap[1][2];
@@ -169,7 +179,7 @@ void releaseParam (ParamVal * const pP)
    if (pP && pP->var.pK) { free(pP->var.pK); pP->var.pK= NULL; }
 } // releaseParam
 
-Bool32 initHBT (HostBuffTab * const pT, const size_t fb, const U32 mF)
+Bool32 initHBT (HostBuffTab * const pT, const size_t fb, const U32 mF, const U32 nH)
 {
    U32 nF= 0, i= 0;
    Bool32 a;
@@ -192,6 +202,26 @@ Bool32 initHBT (HostBuffTab * const pT, const size_t fb, const U32 mF)
          nF+= 2;
       }
    } while (a && (nF < mF) && (++i < HFB_MAX));
+
+   initNFS( &(pT->sg.fsA), 1, NULL, 0 );
+   initNFS( &(pT->sg.fsB), 1, NULL, 0 );
+
+   if (nH > 0)
+   {
+      pT->sg.hB.pH= NULL; pT->sg.hB.nH= 0;
+      pT->sg.mb.bytes= nH * sizeof(*(pT->sg.hB.pH));
+      pT->sg.mb.p= malloc( pT->sg.mb.bytes );
+      if (pT->sg.mb.p)
+      {
+         memset(pT->sg.mb.p, 0, pT->sg.mb.bytes);
+         pT->sg.hB.pH= pT->sg.mb.p;
+         pT->sg.hB.nH= nH; 
+         pT->sg.hMap[0]= (nH - 1) / 1.0;
+         pT->sg.hMap[1]= 0.0;
+         pT->sg.rMap[0]= 1.0 / pT->sg.hMap[0];
+         pT->sg.rMap[1]= -(pT->sg.rMap[0] * pT->sg.hMap[1]);
+      }
+   }
    return(mF == nF);
 } // initHBT
 
@@ -201,6 +231,7 @@ void releaseHBT (HostBuffTab * const pT)
    { 
       if (pT->hfb[i].pAB) { free(pT->hfb[i].pAB); pT->hfb[i].pAB= NULL; }
    }
+   if (pT->sg.mb.p) { free(pT->sg.mb.p); pT->sg.mb.p= NULL; }
    if (pT->pC) { free(pT->pC); pT->pC= NULL; }
 } // releaseHBT
 
@@ -290,15 +321,25 @@ void initNFS (FieldStat fs[], const U32 nFS, const Scalar * const pS, const U32 
    }
 } // initNFS
 
-void statAdd (FieldStat * const pFS, Scalar s)
+void statAdd (FieldStat * const pFS, Scalar s) // w
 {
    if (s < pFS->min) { pFS->min= s; }
    if (s > pFS->max) { pFS->max= s; }
    pFS->n++;
-   pFS->s.m[0]+= 1;
-   pFS->s.m[1]+= s;
-   pFS->s.m[2]+= s * s;
+   pFS->s.m[0]+= 1; // w
+   pFS->s.m[1]+= s; // w * s
+   pFS->s.m[2]+= s * s; // w * s * s
 } // statAdd
+
+void statMerge (FieldStat * const pFS, FieldStat * const pFS1, FieldStat * const pFS2)
+{
+   pFS->min= MIN(pFS1->min, pFS2->min);
+   pFS->max= MAX(pFS1->max, pFS2->max);
+   pFS->n= pFS1->n + pFS2->n;
+   pFS->s.m[0]= pFS1->s.m[0] + pFS2->s.m[0];
+   pFS->s.m[1]= pFS1->s.m[1] + pFS2->s.m[1];
+   pFS->s.m[2]= pFS1->s.m[2] + pFS2->s.m[2];
+} // statMerge
 
 void printNFS (const FieldStat fs[], const U32 nFS, const FSFmt * pFmt)
 {

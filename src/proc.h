@@ -1,6 +1,6 @@
 // proc.h - Gray-Scott Reaction-Diffusion using OpenACC
 // https://github.com/DrAl-HFS/GSRD.git
-// (c) GSRD Project Contributors Feb-April 2018
+// (c) GSRD Project Contributors Feb-October 2018
 
 #ifndef PROC_H
 #define PROC_H

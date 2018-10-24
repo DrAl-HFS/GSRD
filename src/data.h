@@ -1,6 +1,6 @@
 // data.h - Gray-Scott Reaction-Diffusion using OpenACC
 // https://github.com/DrAl-HFS/GSRD.git
-// (c) GSRD Project Contributors Feb-April 2018
+// (c) GSRD Project Contributors Feb-October 2018
 
 #ifndef DATA_H
 #define DATA_H
@@ -101,8 +101,17 @@ typedef struct
 
 typedef struct
 {
+   MemBuff     mb;
+   FieldStat  fsA, fsB;
+   HistZ       hB;
+   Scalar      hMap[2], rMap[2];
+} StatG;
+
+typedef struct
+{
    HostFB   hfb[HFB_MAX];
-   Scalar   *pC; // conservation tally field
+   StatG    sg;
+   Scalar   *pC; // conservation tally field ?
 } HostBuffTab;
 
 typedef struct
@@ -115,7 +124,7 @@ typedef struct
 /***/
 
 // void initWrap (BoundaryWrap *pW, const Stride stride[4]);
-extern void initOrg (ImgOrg * const pO, U16 w, U16 h, U8 flags);
+extern void initOrg (ImgOrg * const pO, const U16 w, const U16 h, const U8 flags);
 extern size_t initParam
 (
    ParamVal * const pP, 
@@ -126,7 +135,7 @@ extern size_t initParam
 ); // ParamArgs *
 
 extern void releaseParam (ParamVal * const pP);
-extern Bool32 initHBT (HostBuffTab * const pT, const size_t fb, const U32 mF);
+extern Bool32 initHBT (HostBuffTab * const pT, const size_t fb, const U32 mF, const U32 nH);
 extern void releaseHBT (HostBuffTab * const pT);
 
 
@@ -135,6 +144,7 @@ extern size_t initHFB (HostFB * const pB, const ImgOrg * const pO, const U8 patt
 
 extern void initNFS (FieldStat fs[], const U32 nFS, const Scalar * const pS, const U32 mS);
 extern void statAdd (FieldStat * const pFS, Scalar s);
+extern void statMerge (FieldStat * const pFS, FieldStat * const pFS1, FieldStat * const pFS2);
 extern void printNFS (const FieldStat fs[], const U32 nFS, const FSFmt * pFmt);
 
 #endif // DATA_H

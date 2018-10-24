@@ -1,3 +1,6 @@
+// util.h - Gray-Scott Reaction-Diffusion using OpenACC
+// https://github.com/DrAl-HFS/GSRD.git
+// (c) GSRD Project Contributors Feb-October 2018
 
 #ifndef UTIL_H
 #define UTIL_H
@@ -65,6 +68,11 @@ typedef struct
 
 typedef struct
 {
+   size_t *pH, nH;
+} HistZ;
+
+typedef struct
+{
    size_t bytes;
    union { void *p; size_t w; };
 } MemBuff;
@@ -94,10 +102,16 @@ extern U32 statGetRes1 (StatRes1 * const pR, const StatMom * const pS, const SMV
 
 extern int scanEnvID (int v[], int max, const char *id);
 
+extern int charInSet (const char c, const char set[]);
+extern int skipSet (const char s[], const char set[]);
 extern int skipPastSet (const char str[], const char set[]);
+
+extern int scanNI32 (int v[], const int maxV, const char str[], int *pNS, const char skip[], const char end[]);
+extern int scanNF32 (float v[], const int maxV, const char str[], int *pNS, const char skip[], const char end[]);
 extern int scanTableF32 (float v[], int maxV, MinMaxI32 *pW, const char str[], int *pNS, const int maxS);
 
-// extern const char *sc (const char *s, const char c, const char * const e, const I8 o);
-//extern int scanVI (int v[], const int vMax, ScanSeg * const pSS, const char s[]);
+extern size_t sumNZU (const size_t z[], const size_t n);
+extern size_t accumNZU (size_t a[], const size_t z[], const size_t n);
+extern double scaleFNZU (double f[], const size_t z[], const size_t n, const double s);
 
 #endif // UTIL_H
