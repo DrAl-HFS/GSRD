@@ -218,6 +218,29 @@ I32 scanTableF32 (F32 v[], I32 maxV, MinMaxI32 *pW, const char str[], I32 *pNS, 
    return(nV);
 } // scanTableF32
 
+F32 linearityF32 (const F32 t[], const I32 n)
+{
+   F32 r= 0;
+   if (n > 1)
+   {
+      const I32 m= n-1;
+      const F32 de= (t[n-1] - t[0]) / m;
+      F32 e, f, g, s2=0;
+
+      e= t[0];
+      for (I32 i= 1; i < m; ++i)
+      {
+         e+= de;
+         f= e - t[i];
+         s2+= f * f;
+      }
+      g= de * de * (m-1);
+      g+= (0 >= g);
+      r= 1 - sqrtf(s2 / g);
+   }
+   return(r);
+} // linearityF32
+
 size_t sumNZU (const size_t z[], const size_t n)
 {
    size_t t= 0;

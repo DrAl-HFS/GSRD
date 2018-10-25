@@ -107,6 +107,11 @@ extern I32 scanNI32 (I32 v[], const I32 maxV, const char str[], I32 *pNS, const 
 extern I32 scanNF32 (F32 v[], const I32 maxV, const char str[], I32 *pNS, const char skip[], const char end[]);
 extern I32 scanTableF32 (F32 v[], I32 maxV, MinMaxI32 *pW, const char str[], I32 *pNS, const I32 maxS);
 
+// Assess linear progression in a sequence of numbers, using first and last as reference
+// Based on "Gaussian linear regression" style SSD measurement on expected even spacing of intervening values
+// Returns measure from 1.0 (perfect linearity) to 0.0 or lower (when deviations exceed expected spacing)
+extern F32 linearityF32 (const F32 t[], const I32 n);
+
 extern size_t sumNZU (const size_t z[], const size_t n);
 extern size_t accumNZU (size_t a[], const size_t z[], const size_t n);
 extern double scaleFNZU (F64 f[], const size_t z[], const size_t n, const F64 s);

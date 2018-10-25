@@ -87,7 +87,7 @@ size_t loadFrame
 size_t saveRGB (const HostFB * const pF, char path[], int m, int n, const ImgOrg * const pO, const ImgMap * const pM)
 {
    U8 *pB= gCtx.ws.p;
-   size_t b= imageTransferRGB(pB, pF->pAB, pO, 0);
+   size_t b= imageTransferRGB(pB, pF->pAB, pO, pM);
 
    n+= snprintf(path+n, m-n, "_%lux%lu_3U8.rgb", pO->def.x, pO->def.y);
    return saveBuff(pB, path, b);
