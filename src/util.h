@@ -74,6 +74,7 @@ typedef struct
 } MemBuff;
 //typedef struct { union { void *p; size_t w; }; size_t b; } Buffer; // char *p;
 
+typedef struct { F32 x, y; } V2F32;
 typedef struct { U16 x, y; } V2U16;
 typedef struct { U32 x, y; } V2U32;
 typedef struct { I32 min, max; } MinMaxI32;

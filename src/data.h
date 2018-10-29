@@ -140,9 +140,9 @@ extern void releaseHBT (HostBuffTab * const pT);
 
 
 
-extern size_t initHFB (HostFB * const pB, const ImgOrg * const pO, const U8 patternID);
+extern size_t initHFB (HostFB * const pB, const ImgOrg * const pO, const PatternInfo *pPI);
 
-extern void initNFS (FieldStat fs[], const U32 nFS, const Scalar * const pS, const U32 mS);
+extern void initNFS (FieldStat * const pFS, const U32 nFS, const Scalar * const pS, const U32 mS);
 extern void statAdd (FieldStat * const pFS, Scalar s);
 extern void statMerge (FieldStat * const pFS, FieldStat * const pFS1, FieldStat * const pFS2);
 extern void printNFS (const FieldStat fs[], const U32 nFS, const FSFmt * pFmt);

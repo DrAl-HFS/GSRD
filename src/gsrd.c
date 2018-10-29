@@ -124,7 +124,7 @@ size_t saveFrame
    const ImgOrg   * const pO, 
    const ArgInfo  * const pA,
    const ImgMap   * const pM,
-   const U8       tID
+   const U8       usage
 )
 {
    size_t r= 0;
@@ -136,15 +136,16 @@ size_t saveFrame
 
       do
       {
-         const U8 t= pA->files.outType[i];
-         if ((t & 0xF0) == tID)
+         const U8 id= pA->files.outType[i] & ID_MASK;
+         const U8 tu= pA->files.outType[i] & USAGE_MASK;
+         if (tu & usage)
          {
             int n= genOutPath1(path, m, pA->files.outPath[i], pA->files.outName, pF->iter);
-            switch(t & 0x0F) 
+            switch(id) 
             {
-               case 2 : r= saveRaw(pF,path,m,n,pO); break;
-               case 3 : r= saveRGB(pF,path,m,n,pO,pM); break;
-               default : printf("saveFrame() - t=%u\n", t);
+               case ID_FILE_RAW : r= saveRaw(pF,path,m,n,pO); break;
+               case ID_FILE_RGB : r= saveRGB(pF,path,m,n,pO,pM); break;
+               default : printf("saveFrame() - id=%u??\n", id);
             }
             printf("saveFrame() - %s %p %zu bytes\n", path, pF->pAB, r);
          }
@@ -287,7 +288,7 @@ void postProc (const ArgInfo *pAI)
    if (FLAG_FILE_XFER & pAI->files.flags)
    {
       char path[256];
-      const char *pOP=NULL;
+      const char *pRP=NULL;
       const I32 m= sizeof(path)-1;
       DataFileInfo dfi;
       HostFB *pFrame= gCtx.hbt.hfb+0;
@@ -295,23 +296,26 @@ void postProc (const ArgInfo *pAI)
 
       memset(&dfi, 0, sizeof(dfi));
       dfi.filePath= path;
-      {
+      {  // Select previous (raw) output path
          U8 j=0;
-         while ((NULL == pOP) && (j < pAI->files.nOutPath))
+         while ((NULL == pRP) && (j < pAI->files.nOutPath))
          {
-            if (2 == pAI->files.outType[j]) { pOP= pAI->files.outPath[j]; }
+            const U8 id= ID_MASK & pAI->files.outType[j];
+            if (ID_FILE_RAW == id) { pRP= pAI->files.outPath[j]; }
             j++;
          }
       }
+      //if (NULL == pOP) { printf("WARNING: postProc() - transfer path unspecified?\n"); }
       i= gCtx.baseIter;
       do
       {
-         I32 n= genOutPath1(path, m, pOP, pAI->files.outName, i);
+         I32 n= genOutPath1(path, m, pRP, pAI->files.outName, i);
          n+= snprintf(path+n, m-n, "(%lu,%lu,2)F64.raw", gCtx.org.def.x, gCtx.org.def.y);
 
+         printf("postProc() - %s\n", path);
          if (scanDFI(&dfi, path) && loadFrame(pFrame, &dfi))
          {
-            saveFrame(pFrame, &(gCtx.org), pAI, &imgMap, 0x80);
+            saveFrame(pFrame, &(gCtx.org), pAI, &imgMap, USAGE_XFER);
          }
          i+= pAI->proc.subIter;
       } while (i <= pAI->proc.maxIter);
@@ -418,8 +422,8 @@ int main ( int argc, char* argv[] )
          pFrame= gCtx.hbt.hfb + afb;
          if (0 == loadFrame(pFrame, pIF))  //printf("nB=%zu\n",
          {
-            initHFB(pFrame, &(gCtx.org), pII->patternID);
-            saveFrame(pFrame, &(gCtx.org), &ai, NULL, 0x0);
+            initHFB(pFrame, &(gCtx.org), &(pII->pattern));
+            saveFrame(pFrame, &(gCtx.org), &ai, NULL, USAGE_INITIAL);
          }
          gCtx.iter= gCtx.baseIter= pFrame->iter;
          //k= (gCtx.iter - pFrame->iter) & 0x1;
@@ -443,7 +447,7 @@ int main ( int argc, char* argv[] )
             summarise(pFrame+k, &(gCtx.hbt.sg), &(gCtx.org));
             printf("\ttE= %G, %G\n", tE0, tE1);
 
-            saveFrame(pFrame+k, &(gCtx.org), &ai, NULL, 0x0);
+            saveFrame(pFrame+k, &(gCtx.org), &ai, NULL, USAGE_PERIODIC);
          } while (gCtx.iter < pPI->maxIter);
          fprintf(stderr,"%s\t%zu\t%zu\t%G\n", pFrame->label, pPI->maxIter, pPI->subIter, tE1);
          if (nIdx < 4) { fIdx[nIdx++]= afb+k; }

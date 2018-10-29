@@ -56,7 +56,7 @@ static void clean (signed char *pS, size_t n)
    while (pS[n] < ' ') { printf("[%zu] 0x%02X\n", n, 0xFF & pS[n]); --n; }
 } // clean
 
-I32 findLH (F32 v, ImageLUT *pL)
+I32 findLH (F32 v, const ImageLUT *pL)
 {
    I32 l= -1, m= pL->n, i= 0, j= 0;
    while ((i < pL->nL) && (v < pL->pT[l-i])) { ++i; }
@@ -193,6 +193,7 @@ size_t imageTransferRGB (U8 *pRGB, const Scalar * const pAB, const ImgOrg * cons
 
    if (pL)
    {
+      //size_t out[3]= {0,0,0};
       printf("imageTransferRGB() %G,%G -> %G,%G\n", dom[0], dom[1], dom[0] * map[0] + map[1], dom[1] * map[0] + map[1]);
       m= pL->n - 1;
       for (y= 0; y < pO->def.y; y++)
@@ -205,22 +206,16 @@ size_t imageTransferRGB (U8 *pRGB, const Scalar * const pAB, const ImgOrg * cons
             //a= pAB[i]; 
             b= pAB[i + pO->stride[3]];
             
-            if ((b >= dom[0]) && (b <= dom[1]))
-            {
-               j= b * map[0] + map[1];
-               pT= pL->pRGBX + j; 
-            }
-            else
-            {
-               pT= pL->pRGBX + findLH(b, pL); 
-            }
-            //else { pT= pL->lh+0; }
+            if ((b >= dom[0]) && (b <= dom[1])) { j= b * map[0] + map[1]; }
+            else { j= findLH(b, pL); } //if (j < 0) { out[j+pL->nL]++; } }
             
-            pRGB[k++]= pT->r;
+            pT= pL->pRGBX + j;
+            pRGB[k++]= pT->r;// + pAB[i] * 0x80;
             pRGB[k++]= pT->g;
             pRGB[k++]= pT->b;
          }
       }
+      //printf("out[]=%zu %zu %zu\n", out[0], out[1], out[2]);
    }
    else
    {

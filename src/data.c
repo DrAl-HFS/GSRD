@@ -235,12 +235,70 @@ void releaseHBT (HostBuffTab * const pT)
    if (pT->pC) { free(pT->pC); pT->pC= NULL; }
 } // releaseHBT
 
+typedef Bool32 (*ShapeFunc)(F32,F32,F32);
 
-size_t initHFB (HostFB * const pB, const ImgOrg * const pO, const U8 patternID)
+static Bool32 sfr (F32 dx, F32 dy, F32 r)
+{
+   return((fabs(dx) <= r) && (fabs(dy) <= r));
+} // sfr
+
+static Bool32 sfc (F32 dx, F32 dy, F32 r)
+{
+   return((dx*dx + dy*dy) <= (r*r));
+} // sfc
+
+size_t genBlob (HostFB * const pB, const ImgOrg * const pO, const V2F32 *pC, const F32 r, RandF *pR, ShapeFunc f)
 {
    size_t i, j, nB= 0;
-   int x, y, ix, iy, mx, my;
+   V2U32 m= { pC->x+r+1, pC->y+r+1 };
+   for (I32 iy= pC->y-r; iy <= m.y; iy++)
+   { 
+      for (I32 ix= pC->x-r; ix <= m.x; ix++)
+      {
+         if (f(ix-pC->x, iy-pC->y, r))
+         {
+            i= ix * pO->stride[0] + iy * pO->stride[1];
+            j= i + pO->stride[3];
+            pB->pAB[i]= 0.5; pB->pAB[j]= 0.25 + randF(pR); 
+            nB++;
+         }
+      }
+   }
+   return(nB);
+} // genBlob
+
+typedef struct
+{
+   V2U16 i, s;
+} RectLat;
+
+void genRectLat (RectLat *pL, const V2U32 *pDef, U8 border, U32 n)
+{
+   if (n > 1)
+   {
+      const V2U32 sub= {pDef->x - 2 * border, pDef->y - 2 * border};
+      F32 dA= ((F32) sub.x * sub.y) / n;
+      F32 dW= 0.5 * sqrt(dA);
+      pL->s.x= pL->s.y= MAX(2,dW);
+      pL->i.x= border + (pL->s.x + (sub.x % pL->s.x)) / 2;
+      pL->i.y= border + (pL->s.y + (sub.y % pL->s.y)) / 2;
+   }
+   else
+   {
+      pL->i.x= pDef->x / 2;
+      pL->i.y= pDef->y / 2;
+      pL->s= pL->i;
+   }
+} // genRectLat
+
+size_t initHFB (HostFB * const pB, const ImgOrg * const pO, const PatternInfo *pPI)
+{
+   size_t i, j, nB= 0;
+   int x, y;
    RandF rf={{0,0},};
+   ShapeFunc pSF= NULL;
+   const I32 minD= MIN(pO->def.x, pO->def.y);
+   RectLat rl;
 
    memset(pB->pAB, 0, pO->n * sizeof(*(pB->pAB)));
    for (y= 0; y < pO->def.y; y++)
@@ -248,41 +306,58 @@ size_t initHFB (HostFB * const pB, const ImgOrg * const pO, const U8 patternID)
       for (x= 0; x < pO->def.x; x++)
       {
          i= x * pO->stride[0] + y * pO->stride[1];
-         pB->pAB[i]= 0.5 + 0.5 * (1 & (x ^ y));
+         pB->pAB[i]= 0.4 + 0.2 * (1 & (x ^ y));
       }
    }
 
-   if (patternID & 0x4) { initRF(&rf, 0.25, -0.125, 54321); }
-   switch ( patternID & 0x3 )
+   if (charInSet('R', pPI->id+1)) { initRF(&rf, 0.25, -0.125, 54321); }
+   switch ( pPI->id[0] )
    {
-      case 1 :
-      case 2 :
-      {
-         int k= MIN(pO->def.x, pO->def.y) / 32;
-         mx= pO->def.x / 2; my= pO->def.y / 2;
-         for (y= -k; y < k; y++)
-         { 
-            for (x= -k; x < k; x++)
-            {
-               if ((1 == patternID) || ((x*x + y*y) <= (k*k)))
-               {
-                  i= (mx+x) * pO->stride[0] + (my+y) * pO->stride[1];
-                  j= i + pO->stride[3];
-                  pB->pAB[i]= 0.5; pB->pAB[j]= 0.25 + randF(&rf); 
-                  nB++;
-               }
-            }
+      case 'C' :
+         pSF= sfc;
+         break;
+      case 'S' :
+      case 'R' :
+         pSF= sfr;
+         break;
+      case 'P' :
+         break;
+      default:
+         printf("initHFB() - shape %s???", pPI->id);
+         break;
+   }
+
+   genRectLat(&rl, &(pO->def), 2, pPI->n);
+   printf("rl: %d %d   %d %d\n", rl.i.x, rl.i.y, rl.s.x, rl.s.y);
+   if (pSF)
+   {
+      F32 r= 1;
+      
+      if (0 == pPI->s) { r= minD / 32; }
+      else if (pPI->s < 1.0) { r= pPI->s * minD; }
+      for (y= rl.i.y; y < pO->def.y; y+= rl.s.y)
+      { 
+         for (x= rl.i.x; x < pO->def.x; x+= rl.s.x)
+         {
+            V2F32 c= { x, y };
+            printf("c: %f %f\n", c.x, c.y);
+            nB+= genBlob(pB, pO, &c, r, &rf, pSF);
          }
       }
-      break;
-      default:
-      {
-         i= (pO->stride[1] + pO->stride[2] ) / 2; // midpoint
-         j= i + pO->stride[3];
-         pB->pAB[i]= 0.5; pB->pAB[j]= 0.25; 
-         nB++;
+      printf("genGlob() - %zu\n", nB);
+   }
+   else
+   {
+      for (y= rl.i.y; y < pO->def.y; y+= rl.s.y)
+      { 
+         for (x= rl.i.x; x < pO->def.x; x+= rl.s.x)
+         {
+            i= x * pO->stride[0] + y * pO->stride[1];
+            j= i + pO->stride[3];
+            pB->pAB[i]= 0.5; pB->pAB[j]= 0.25 + randF(&rf);
+            nB++;
+         }
       }
-      break;
    }
    pB->iter= 0;
    // stat ?
