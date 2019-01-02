@@ -19,6 +19,30 @@ static void initWrap (BoundaryWrap *pW, const Stride stride[4])
    pW->h[4]= stride[1] - stride[2]; pW->h[5]= -stride[1];
 } // initWrap
 
+static void setStep8Stride2 (Stride step[8], const Stride stride[2])
+{
+   step[0]= -stride[0];  // -X
+   step[1]= stride[0];   // +X
+   step[2]= -stride[1];  // -Y
+   step[3]= stride[1];   // +Y
+   step[4]= -stride[0] -stride[1]; // -X-Y
+   step[5]= stride[0]  -stride[1]; // +X-Y
+   step[6]= -stride[0] +stride[1]; // -X+Y
+   step[7]= stride[0]  +stride[1]; // +X+Y
+} // setStep8Stride2
+
+static void setWrap8Stride3 (Stride wrap[8], const Stride step[8], const Stride stride[3])
+{
+   wrap[0]= step[0] + stride[1];
+   wrap[1]= step[1] - stride[1];
+   wrap[2]= step[2] + stride[2];
+   wrap[3]= step[3] - stride[2];
+   wrap[4]= step[4] + stride[1] + stride[2];
+   wrap[5]= step[5] - stride[1] + stride[2];
+   wrap[6]= step[6] + stride[1] - stride[2];
+   wrap[7]= step[7] - stride[1] - stride[2];
+} // setWrap8Stri6e3
+
 void initOrg (ImgOrg * const pO, const U16 w, const U16 h, const U8 flags)
 {
    if (pO)
@@ -39,26 +63,32 @@ void initOrg (ImgOrg * const pO, const U16 w, const U16 h, const U8 flags)
       pO->stride[2]= h * pO->stride[1]; // plane / buffer
       pO->n= 2 * w * h; // complete buffer
 // neighbours
-      pO->nhStepWrap[0][0]= -pO->stride[0];
-      pO->nhStepWrap[0][1]= pO->stride[0];
-      pO->nhStepWrap[0][2]= -pO->stride[1];
-      pO->nhStepWrap[0][3]= pO->stride[1];
-
+      setStep8Stride2(pO->nhStepWrap[0], pO->stride);
+/*
+      pO->nhStepWrap[0][0]= -pO->stride[0];  // -X
+      pO->nhStepWrap[0][1]= pO->stride[0];   // +X
+      pO->nhStepWrap[0][2]= -pO->stride[1];  // -Y
+      pO->nhStepWrap[0][3]= pO->stride[1];   // +Y
+      pO->nhStepWrap[0][4]= -pO->stride[0]-pO->stride[1]; // -X-Y
+      pO->nhStepWrap[0][5]= pO->stride[0]-pO->stride[1];  // +X-Y
+      pO->nhStepWrap[0][6]= -pO->stride[0]+pO->stride[1]; // -X+Y
+      pO->nhStepWrap[0][7]= pO->stride[0]+pO->stride[1];  // +X+Y
+*/
       if (flags & FLAG_INIT_BOUND_REFLECT)
       {
-         pO->nhStepWrap[1][0]= 0;
-         pO->nhStepWrap[1][1]= 0;
-         pO->nhStepWrap[1][2]= 0;
-         pO->nhStepWrap[1][3]= 0;
+         for (int i=0; i < 8; i++) { pO->nhStepWrap[1][i]= 0; }
       }
       else
       {
+         setWrap8Stride3(pO->nhStepWrap[1], pO->nhStepWrap[0], pO->stride);
+/*
          pO->nhStepWrap[1][0]= pO->nhStepWrap[0][0] + pO->stride[1];
          pO->nhStepWrap[1][1]= pO->nhStepWrap[0][1] + -pO->stride[1];
          pO->nhStepWrap[1][2]= pO->nhStepWrap[0][2] + pO->stride[2];
          pO->nhStepWrap[1][3]= pO->nhStepWrap[0][3] + -pO->stride[2];
+*/
       }
-
+      // Old junk...
       pO->hw[0]= pO->nhStepWrap[0][3];
       pO->hw[1]= pO->nhStepWrap[1][2];
       pO->hw[2]= pO->nhStepWrap[0][0];
@@ -75,6 +105,93 @@ void initOrg (ImgOrg * const pO, const U16 w, const U16 h, const U8 flags)
       printf("initOrg() - %d errors\n", e);
    }
 } // initOrg
+
+void genMap (MapSite *pM, const U8 *pS, const V2U32 *pDef, const U8 k)
+{
+   Stride s[2]= {1,pDef->x};
+   for (int y=1; y < pDef->y-1; y++)
+   {
+      for (int x=1; x < pDef->x-1; x++)
+      {
+         Index i= x * s[0] + y * s[1];
+         MapSite m=0x00;
+         if (k != pS[i])
+         {
+            m|= (k != pS[i - s[0]]) << 0;
+            m|= (k != pS[i + s[0]]) << 1;
+            m|= (k != pS[i - s[1]]) << 2;
+            m|= (k != pS[i + s[1]]) << 3;
+            m|= (k != pS[i - s[0] - s[1]]) << 4;
+            m|= (k != pS[i + s[0] - s[1]]) << 5;
+            m|= (k != pS[i - s[0] + s[1]]) << 6;
+            m|= (k != pS[i + s[0] + s[1]]) << 7;
+         }
+         pM[i]= m;
+      }
+   }
+/*
+size_t z= 0;
+for (size_t i= 0; i<n; i++) { z+= (0 == pM[i]); }
+printf("genTestMap() - z=%zu\n", z);
+*/
+} // genMap
+
+MapSite *genMapReflective (MapData *pMD, const V2U32 *pDef)
+{
+   const U8 solid= 0;
+   size_t n= pDef->x * pDef->y;
+   size_t m= n * sizeof(MapSite);
+   size_t iy;
+   MapSite *pM= malloc(m);
+   if (pM)
+   { // reflective boundary flag layout: 
+     // 0x8A .. 0xCB .. 0x49
+     // 0xAE .. 0xFF .. 0x5D
+     // 0x26 .. 0x37 .. 0x15  
+      memset(pM, 0, m);
+      pM[0]= 0x8A;
+      for (int x=1; x < pDef->x-1; x++) { pM[ x ]=0xCB; }
+      pM[pDef->x-1]= 0x49;
+      for (int y=1; y < pDef->y-1; y++)
+      {
+         iy= y * pDef->x;
+         pM[ iy ]= 0xAE;
+         pM[ pDef->x-1 + iy ]= 0x5D;
+         for (int x=1; x < pDef->x-1; x++) { pM[ x + iy ]=0xFF; }
+      }
+      iy= (pDef->y - 1) * pDef->x;
+      pM[ iy ]= 0x26;
+      for (int x=1; x < pDef->x-1; x++) { pM[ x + iy ]= 0x37; }
+      pM[ pDef->x-1 + iy ]= 0x15;
+
+      if (solid)
+      {
+         U8 *pS= malloc(n);
+         if (pS)
+         {
+            int lx= pDef->x / 4, ux= lx * 3;
+            int ly= pDef->y / 4, uy= ly * 3;
+            
+            memset(pS, 0, n);
+            for (int y=ly; y < uy; y++)
+            {
+               iy= y * pDef->x;
+               for (int x=lx; x < ux; x++) { pS[ x + iy ]= solid; }
+            }
+            genMap(pM, pS, pDef, solid);
+            free(pS);
+         }
+      }
+      if (pMD) { pMD->pM= pM; pMD->nM= n; }
+   }
+   return(pM);
+} // genMapReflective
+
+MapSite *genMapPeriodic (MapData *pMD, const V2U32 *pDef)
+{  // unsupported
+   if (pMD) { pMD->pM= NULL; pMD->nM= 0; }
+   return(NULL);
+} // genMapPeriodic
 
 //size_t paramBytes (U16 w, U16 h) { return(MAX(w,h) * 3 * sizeof(Scalar)); }
 Scalar validateKL (Scalar kR[3], const Scalar kL[3])
@@ -363,6 +480,27 @@ size_t initHFB (HostFB * const pB, const ImgOrg * const pO, const PatternInfo *p
    // stat ?
    return(nB);
 } // initHFB
+
+size_t initMapHFB (HostFB * const pB, const ImgOrg * const pO, const MapSite ms[], const MapInitVal miv[])
+{
+   size_t i, j, s= 0;
+   int x, y, m;
+
+   for (y= 0; y < pO->def.y; y++)
+   { 
+      for (x= 0; x < pO->def.x; x++)
+      {
+         m= ms[x + y * pO->def.x];
+         s+= m;
+         i= x * pO->stride[0] + y * pO->stride[1];
+         j= i + pO->stride[3];
+         pB->pAB[i]= miv[m].a;
+         pB->pAB[j]= miv[m].b;
+      }
+   }
+   return(s);
+} // initMapHFB
+
 
 #ifndef M_INF
 #define M_INF  1E308

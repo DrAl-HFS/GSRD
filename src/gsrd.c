@@ -11,6 +11,7 @@ typedef struct
    ParamVal    pv;
    HostBuffTab hbt;
    ImgOrg      org;
+   MapData     map;
    size_t      iter, baseIter;
    MemBuff     ws;
 } Context;
@@ -40,6 +41,13 @@ Context *initCtx (Context * const pC, const V2U16 * const pD, U16 nF, const ArgI
 
       initOrg(&(pC->org), w, h, pAI->init.flags);
 
+      if (FLAG_INIT_MAP & pAI->init.flags)
+      {
+         if (FLAG_INIT_BOUND_REFLECT & pAI->init.flags)
+         { genMapReflective(&(pC->map), &(pC->org.def)); }
+         else { genMapPeriodic(&(pC->map), &(pC->org.def)); }
+      }
+      // Workspace for RGB image & palette
       pC->ws.bytes= w * h * 4 + (8<<10);
       pC->ws.bytes&= ~((4 << 10) - 1);
       pC->ws.p= malloc(pC->ws.bytes);
@@ -64,6 +72,7 @@ void releaseCtx (Context * const pC)
    {
       releaseParam(&(pC->pv));
       releaseHBT(&(pC->hbt));
+      if (pC->map.pM) { free(pC->map.pM); } //releaseMap();
       if (pC->ws.p) { free(pC->ws.p); }
       memset(pC, 0, sizeof(*pC));
    }
@@ -437,7 +446,7 @@ int main ( int argc, char* argv[] )
             if (iM > iR) { iM= iR; }
 
             deltaT();
-            gCtx.iter+= procNI(pFrame[(k^0x1)].pAB, pFrame[k].pAB, &(gCtx.org), &(gCtx.pv), iM);
+            gCtx.iter+= i= procNI(pFrame[(k^0x1)].pAB, pFrame[k].pAB, &(gCtx.org), &(gCtx.pv), iM, &(gCtx.map));
             tE0= deltaT();
             tE1+= tE0;
             
@@ -448,7 +457,7 @@ int main ( int argc, char* argv[] )
             printf("\ttE= %G, %G\n", tE0, tE1);
 
             saveFrame(pFrame+k, &(gCtx.org), &ai, NULL, USAGE_PERIODIC);
-         } while (gCtx.iter < pPI->maxIter);
+         } while ((i > 0) && (gCtx.iter < pPI->maxIter));
          fprintf(stderr,"%s\t%zu\t%zu\t%G\n", pFrame->label, pPI->maxIter, pPI->subIter, tE1);
          if (nIdx < 4) { fIdx[nIdx++]= afb+k; }
          afb+= 2;

@@ -75,7 +75,7 @@ typedef struct
    V2U32  def;
    Stride stride[4];
    size_t n;
-   Stride nhStepWrap[2][4], hw[6]; // neighbourhood 
+   Stride nhStepWrap[2][8], hw[6]; // neighbourhood 
    BoundaryWrap wrap;
 } ImgOrg;
 
@@ -121,10 +121,27 @@ typedef struct
    Scalar   sPer;   // Percentage scale
 } FSFmt;
 
+typedef U8 MapSite;
+
+typedef struct
+{
+   MapSite  *pM;
+   size_t   nM;
+} MapData;
+
+typedef struct
+{
+   Scalar a, b;
+} MapInitVal;
+
 /***/
 
 // void initWrap (BoundaryWrap *pW, const Stride stride[4]);
 extern void initOrg (ImgOrg * const pO, const U16 w, const U16 h, const U8 flags);
+
+MapSite *genMapReflective (MapData *pMD, const V2U32 *pDef);
+MapSite *genMapPeriodic (MapData *pMD, const V2U32 *pDef);
+
 extern size_t initParam
 (
    ParamVal * const pP, 
@@ -136,6 +153,7 @@ extern size_t initParam
 
 extern void releaseParam (ParamVal * const pP);
 extern Bool32 initHBT (HostBuffTab * const pT, const size_t fb, const U32 mF, const U32 nH);
+extern size_t initMapHFB (HostFB * const pB, const ImgOrg * const pO, const MapSite ms[], const MapInitVal miv[]);
 extern void releaseHBT (HostBuffTab * const pT);
 
 

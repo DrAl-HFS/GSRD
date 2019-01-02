@@ -98,10 +98,12 @@ static void addDevType (AccDevTable *pT, const U8 c, const U8 nC, const U8 x0, c
 
 /*** Application (model) routines ***/
 
+// Diffusion operators:
+
 // Compute a symmetric 9-point discrete Laplacian operator on a 2D scalar field using
 // four stride offsets to deal with boundary conditions.
 // pS gives the address of the scalar value at the centre of the operator kernel
-// Strides s[0..3] -> +-X +-Y
+// Strides s[0..3] -> -X, +X -Y, +Y
 // Weights k[0..2] centre, horizontal&vertical, diagonal
 INLINE Scalar laplace2D4S9P (const Scalar * const pS, const Stride s[4], const Scalar k[3])
 {
@@ -110,6 +112,19 @@ INLINE Scalar laplace2D4S9P (const Scalar * const pS, const Stride s[4], const S
            (pS[ s[0]+s[2] ] + pS[ s[0]+s[3] ] + pS[ s[1]+s[2] ] + pS[ s[1]+s[3] ]) * k[2] ); 
 } // laplace2D4S9P
 
+// As preceding but eight stride offsets to deal with arbitrary spatial structure.
+// pS gives the address of the scalar value at the centre of the operator kernel
+// Strides s[0..3] -> -X, +X -Y, +Y, s[4..7] -> ??? -X-Y, +X-Y, -X+Y, +X+Y ???
+// Weights k[0..2] centre, horizontal&vertical, diagonal
+INLINE Scalar laplace2D8S9P (const Scalar * const pS, const Stride s[8], const Scalar k[3])
+{
+   return( pS[0] * k[0] +
+           (pS[ s[0] ] + pS[ s[1] ] + pS[ s[2] ] + pS[ s[3] ]) * k[1] + 
+           (pS[ s[4] ] + pS[ s[5] ] + pS[ s[6] ] + pS[ s[7] ]) * k[2] ); 
+} // laplace2D8S9P
+
+/***/
+// RENAME proc2D4S9P ???
 // Compute a single point Grey-Scott update based on the preceding Laplacian operator applied to
 // each of the reagent scalar fields A & B. Double-buffering of scalar fields is used to prevent
 // temporal feed-back error while maintaining relatively straightforward parallelisability.
@@ -158,6 +173,80 @@ void procAXY (Scalar * restrict pR, const Scalar * restrict pS, const ImgOrg * p
       }
    }
 } // procAXY
+
+/*** Modified versions for complex geometry specified by map ***/
+
+INLINE void proc2D8S9P (Scalar * const pR, const Scalar * const pS, const Index i, const Stride j, const Stride wrap[8], const BaseParamVal * const pP)
+{
+   const Scalar * const pA= pS+i, a= *pA;
+   const Scalar * const pB= pS+i+j, b= *pB;
+   const Scalar rab2= a * b * b; //pP->kRR * 
+
+   pR[i]= a + laplace2D8S9P(pA, wrap, pP->kL.a) - rab2 + pP->kRA * (1 - a);
+   pR[i+j]= b + laplace2D8S9P(pB, wrap, pP->kL.b) + rab2 - pP->kDB * b;
+} // proc2D8S9P
+
+// Wrapper function for proc2D8S9P() that determines wrap values for the local spatial indices using map entry
+// This automates boundary processing.
+INLINE void proc1M8S (Scalar * const pR, const Scalar * const pS, const Index x, const Index y, const ImgOrg *pO, const BaseParamVal * const pP, const MapSite m)
+{
+   Stride wrap[8];
+   wrap[0]= pO->nhStepWrap[ (0 == (m & 0x01)) ][0];
+   wrap[1]= pO->nhStepWrap[ (0 == (m & 0x02)) ][1];
+   wrap[2]= pO->nhStepWrap[ (0 == (m & 0x04)) ][2];
+   wrap[3]= pO->nhStepWrap[ (0 == (m & 0x08)) ][3];
+   wrap[4]= pO->nhStepWrap[ (0 == (m & 0x10)) ][4];
+   wrap[5]= pO->nhStepWrap[ (0 == (m & 0x20)) ][5];
+   wrap[6]= pO->nhStepWrap[ (0 == (m & 0x40)) ][6];
+   wrap[7]= pO->nhStepWrap[ (0 == (m & 0x80)) ][7];
+
+   proc2D8S9P(pR, pS, x * pO->stride[0] + y * pO->stride[1], pO->stride[3], wrap, pP);
+} // proc1M8S
+
+// Single GS iteration over field/image with non-uniform structure using neighbour map for reflective boundary check at every site
+void procMXY (Scalar * restrict pR, const Scalar * restrict pS, const ImgOrg * pO, const BaseParamVal * pP, const MapData * pMD)
+{
+   const MapSite * const pM= pMD->pM;
+   #pragma acc data present( pR[:pO->n], pS[:pO->n], pM[:pMD->nM], pO[:1], pP[:1] )
+   {
+      #pragma acc parallel loop
+      for (U32 y= 0; y < pO->def.y; ++y )
+      {
+         #pragma acc loop vector
+         for (U32 x= 0; x < pO->def.x; ++x )
+         {
+            const MapSite m= pM[ x + y * pO->def.x ];
+
+            if (0 != m) { proc1M8S(pR, pS, x, y, pO, pP, m); }
+         }
+      }
+   }
+} // procMXY
+
+// Multiple GS iterations of even number - minimises buffer copying
+U32 proc2IM
+(
+   Scalar * restrict pTR, // temp "result" (unused if acc. device has sufficient private memory)
+   Scalar * restrict pSR, // source & result buffer
+   const ImgOrg   * pO, 
+   const ParamVal * pP, 
+   const U32      nI,
+   const MapData  * pMD
+)
+{
+   #pragma acc data present_or_create( pTR[:pO->n] ) copy( pSR[:pO->n] ) \
+                    present_or_copyin( pMD->pM[:pMD->nM], pO[:1], pP[:1] )
+   {
+      for (U32 i= 0; i < nI; ++i )
+      {
+         procMXY(pTR,pSR,pO,&(pP->base),pMD);
+         procMXY(pSR,pTR,pO,&(pP->base),pMD);
+      }
+   }
+   return(2*nI);
+} // proc2IM
+
+/**/
 
 // Single GS iteration over field/image, avoiding most boundary checking
 void procA (Scalar * restrict pR, const Scalar * restrict pS, const ImgOrg * pO, const BaseParamVal * pP)
@@ -539,17 +628,26 @@ U32 procNI
    Scalar * restrict pS,
    const ImgOrg   * pO,
    const ParamVal * pP,
-   const U32 nI
+   const U32      nI,
+   const MapData  * pMD
 )
 {
-   if (nI & 1) return proc2I1A(pR, pS, pO, pP, nI>>1);
+   if (pMD && pMD->pM && (pMD->nM > 0))
+   {
+      if (0 == (nI & 1)) { return proc2IM(pR, pS, pO, pP, nI>>1, pMD); }
+   }
    else
    {
-      /*U32 n= hackMD(pR, pS, pO, pP, nI>>1);
-      if (0 == n) { n= proc2IA(pR, pS, pO, pP, nI>>1); }
-      return(n);*/
-      return proc2IA(pR, pS, pO, pP, nI>>1);
+      if (nI & 1) return proc2I1A(pR, pS, pO, pP, nI>>1);
+      else
+      {
+         /*U32 n= hackMD(pR, pS, pO, pP, nI>>1);
+         if (0 == n) { n= proc2IA(pR, pS, pO, pP, nI>>1); }
+         return(n);*/
+         return proc2IA(pR, pS, pO, pP, nI>>1);
+      }
    }
+   return(0);
 } // procNI
 
 void procTest (void)

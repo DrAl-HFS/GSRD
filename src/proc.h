@@ -20,7 +20,7 @@ extern Bool32 procSetNextAcc (Bool32 wrap);
 
 
 // Process nI iterations of the model, starting in buffer pS and ending in pR for an even number of iterations (or pS for odd)
-extern U32 procNI (Scalar * restrict pR, Scalar * restrict pS, const ImgOrg * pO, const ParamVal * pP, const U32 nI);
+extern U32 procNI (Scalar * restrict pR, Scalar * restrict pS, const ImgOrg * pO, const ParamVal * pP, const U32 nI, const MapData *pMD);
 
 // Hacky test stuff
 extern void procTest (void);
