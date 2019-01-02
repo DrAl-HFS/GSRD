@@ -324,10 +324,12 @@ void usage (void)
 static char *strtab[]=
 {
    "-A:[H|G|A|N]     Acceleration: Host GPU All None",
+   "-B:[R|P]         Boundary: Reflective Periodic",
    "-C:<path>        Comparison file path",
    "-D:w,h           Define dimensions of simulation domain",
    "-I:<max>,<sub>   Iterations max is total run duration, sub is periodic analysis/save interval",
    "-L:<path>        LUT (colour map) for rgb output",
+   "-M ?struct_file? Enable Map processing of spatial structure; requires reflective boundary",
    "-O:<path>        Output file path and inferred type (raw or rgb)",
    "-P:#[P|S|C][R]#  Initial Pattern # number of Point, Square or Circle with optional Randomised biomass of size #",
    "-R               Interleave (versus planar) scalar fields",

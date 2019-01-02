@@ -75,7 +75,7 @@ typedef struct
    V2U32  def;
    Stride stride[4];
    size_t n;
-   Stride nhStepWrap[2][8], hw[6]; // neighbourhood 
+   Stride nhStepWrap[2][8]; // neighbourhood 
    BoundaryWrap wrap;
 } ImgOrg;
 

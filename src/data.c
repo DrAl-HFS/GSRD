@@ -64,16 +64,7 @@ void initOrg (ImgOrg * const pO, const U16 w, const U16 h, const U8 flags)
       pO->n= 2 * w * h; // complete buffer
 // neighbours
       setStep8Stride2(pO->nhStepWrap[0], pO->stride);
-/*
-      pO->nhStepWrap[0][0]= -pO->stride[0];  // -X
-      pO->nhStepWrap[0][1]= pO->stride[0];   // +X
-      pO->nhStepWrap[0][2]= -pO->stride[1];  // -Y
-      pO->nhStepWrap[0][3]= pO->stride[1];   // +Y
-      pO->nhStepWrap[0][4]= -pO->stride[0]-pO->stride[1]; // -X-Y
-      pO->nhStepWrap[0][5]= pO->stride[0]-pO->stride[1];  // +X-Y
-      pO->nhStepWrap[0][6]= -pO->stride[0]+pO->stride[1]; // -X+Y
-      pO->nhStepWrap[0][7]= pO->stride[0]+pO->stride[1];  // +X+Y
-*/
+
       if (flags & FLAG_INIT_BOUND_REFLECT)
       {
          for (int i=0; i < 8; i++) { pO->nhStepWrap[1][i]= 0; }
@@ -81,28 +72,9 @@ void initOrg (ImgOrg * const pO, const U16 w, const U16 h, const U8 flags)
       else
       {
          setWrap8Stride3(pO->nhStepWrap[1], pO->nhStepWrap[0], pO->stride);
-/*
-         pO->nhStepWrap[1][0]= pO->nhStepWrap[0][0] + pO->stride[1];
-         pO->nhStepWrap[1][1]= pO->nhStepWrap[0][1] + -pO->stride[1];
-         pO->nhStepWrap[1][2]= pO->nhStepWrap[0][2] + pO->stride[2];
-         pO->nhStepWrap[1][3]= pO->nhStepWrap[0][3] + -pO->stride[2];
-*/
       }
-      // Old junk...
-      pO->hw[0]= pO->nhStepWrap[0][3];
-      pO->hw[1]= pO->nhStepWrap[1][2];
-      pO->hw[2]= pO->nhStepWrap[0][0];
-      pO->hw[3]= pO->nhStepWrap[0][1];
-      pO->hw[4]= pO->nhStepWrap[1][3];
-      pO->hw[5]= pO->nhStepWrap[0][2];
 
       initWrap(&(pO->wrap), pO->stride);
-      int e= 0;
-      for (int i=0; i<6; i++)
-      {
-         if (pO->wrap.h[i] != pO->hw[i]) { e++; printf("[%d] %d ?%d?\n", i, pO->wrap.h[i], pO->hw[i]); } 
-      }
-      printf("initOrg() - %d errors\n", e);
    }
 } // initOrg
 
