@@ -145,11 +145,17 @@ MapSite *genMapReflective (MapData *pMD, const V2U32 *pDef)
             int ly= pDef->y / 4, uy= ly * 3;
             
             memset(pS, 0, n);
-            for (int y=ly; y < uy; y++)
+            for (int y=lx; y < ly+4; y++) 
             {
                iy= y * pDef->x;
                for (int x=lx; x < ux; x++) { pS[ x + iy ]= solid; }
             }
+            for (int y=ux; y < uy+4; y++) 
+            {
+               iy= y * pDef->x;
+               for (int x=lx; x < ux; x++) { pS[ x + iy ]= solid; }
+            }
+
             genMap(pM, pS, pDef, solid);
             free(pS);
          }
@@ -398,7 +404,7 @@ size_t initHFB (HostFB * const pB, const ImgOrg * const pO, const PatternInfo *p
          pB->pAB[i]= 0.4 + 0.2 * (1 & (x ^ y));
       }
    }
-
+printf("PI= %u %s %G\n", pPI->n, pPI->id, pPI->s);
    if (charInSet('R', pPI->id+1)) { initRF(&rf, 0.25, -0.125, 54321); }
    switch ( pPI->id[0] )
    {
@@ -420,7 +426,7 @@ size_t initHFB (HostFB * const pB, const ImgOrg * const pO, const PatternInfo *p
    printf("rl: %d %d   %d %d\n", rl.i.x, rl.i.y, rl.s.x, rl.s.y);
    if (pSF)
    {
-      F32 r= 1;
+      F32 r= MAX(1,pPI->s);
       
       if (0 == pPI->s) { r= minD / 32; }
       else if (pPI->s < 1.0) { r= pPI->s * minD; }

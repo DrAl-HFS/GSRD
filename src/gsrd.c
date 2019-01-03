@@ -409,7 +409,8 @@ int main ( int argc, char* argv[] )
    if (argc > 1)
    {
       n= scanArgs(&ai, (const char **)(argv+1), argc-1);
-      printf("proc: f=0x%zX, m=%zu, s=%zu\n", ai.proc.flags, ai.proc.maxIter, ai.proc.subIter);
+      if (0 == n) { return(0); }
+      printf("n=%d proc: f=0x%zX, m=%zu, s=%zu\n", ai.proc.flags, ai.proc.maxIter, ai.proc.subIter);
    }
    procTest();
 

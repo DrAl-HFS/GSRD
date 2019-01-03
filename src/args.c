@@ -233,6 +233,7 @@ int scanArgs (ArgInfo *pAI, const char * const a[], int nA)
                v= toupper( pCh[n] );
                if ('P' == v) { pAI->init.flags&= ~FLAG_INIT_BOUND_REFLECT; }
                if ('R' == v) { pAI->init.flags|= FLAG_INIT_BOUND_REFLECT; }
+               ++nV;
                break;
 
             case 'C' : nV+= ( scanDFI(&(pAI->files.cmp), pCh+n) > 0 );
@@ -262,6 +263,7 @@ int scanArgs (ArgInfo *pAI, const char * const a[], int nA)
                   }
                   //printf("DEF:%s -> %d, %u %u\n", pCh+n, l, pAI->init.def.x, pAI->init.def.y);
                }
+               ++nV;
                break;
 
             case 'I' :
@@ -274,27 +276,34 @@ int scanArgs (ArgInfo *pAI, const char * const a[], int nA)
             case 'L' :
                pAI->files.flags|= FLAG_FILE_LUT;
                pAI->files.lutPath= pCh+n;
+               ++nV;
                break;
 
             case 'M' :
                pAI->init.flags|= FLAG_INIT_MAP;
+               ++nV;
                break;
 
             case 'X' :
                pAI->files.flags|= FLAG_FILE_XFER;
                addOutPath(pAI, pCh+n, USAGE_XFER);
+               ++nV;
                break;
+
             case 'O' :
                pAI->files.flags|= FLAG_FILE_OUT;
                addOutPath(pAI, pCh+n, USAGE_INITIAL|USAGE_PERIODIC|USAGE_FINAL);
+               ++nV;
                break;
 
             case 'P' :
                scanPattern(&(pAI->init.pattern), pCh+n);
+               ++nV;
                break;
 
             case 'R' :
                pAI->init.flags|= FLAG_INIT_ORG_INTERLEAVED;
+               ++nV;
                break;
 
             case 'V' :
@@ -302,6 +311,7 @@ int scanArgs (ArgInfo *pAI, const char * const a[], int nA)
                pAI->param.id[0]= 'B';
                pAI->param.id[1]= 'A';
                pAI->param.id[2]= 'L';
+               ++nV;
                break;
 
             default : printf("scanArgs() - unknown flag -%c\n", c);
