@@ -137,7 +137,7 @@ INLINE void proc1 (Scalar * const pR, const Scalar * const pS, const Index i, co
 {
    const Scalar * const pA= pS+i, a= *pA;
    const Scalar * const pB= pS+i+j, b= *pB;
-   const Scalar rab2= a * b * b; //pP->kRR * 
+   const Scalar rab2= a * b * b; // pP->kRR * 
 
    pR[i]= a + laplace2D4S9P(pA, wrap, pP->kL.a) - rab2 + pP->kRA * (1 - a);
    pR[i+j]= b + laplace2D4S9P(pB, wrap, pP->kL.b) + rab2 - pP->kDB * b;
@@ -554,6 +554,7 @@ Bool32 procInitAcc (size_t f) // arg param ?
    int nNV= acc_get_num_devices( acc_device_nvidia );
    int nH= acc_get_num_devices( acc_device_host );
    int nNH= acc_get_num_devices( acc_device_not_host );
+   int id;
 
    printf("procInitAcc() - nH=%d nNV=%d, (other=%d)\n", nH, nNV, nNH - nNV);
    gDev.nDev= 0;
@@ -563,13 +564,16 @@ Bool32 procInitAcc (size_t f) // arg param ?
       I32 v[2]=0;
       scanEnvID(v+0, 1, "ACC_NUM_CORES");
       scanEnvID(v+1, 1, "OMP_NUM_THREADS");
-      printf("\tH: C%d T%d id=%d\n", v[0], v[1], acc_get_device_num(acc_device_host));
+      id= acc_get_device_num(acc_device_host);
+//acc_get_device_processors(id);???
+      printf("\tH: C%d T%d id=%d\n", v[0], v[1], id);
       addDevType(&gDev, acc_device_host, nH, v[0], v[1]);
       gDev.iHost= 0;
    }
    if ((nNV > 0) && (f & PROC_FLAG_ACCGPU))
    {
-      printf("\tNV:id=%d\n", acc_get_device_num(acc_device_nvidia));
+      id= acc_get_device_num(acc_device_nvidia);
+      printf("\tNV:id=%d\n", id);
       addDevType(&gDev, acc_device_nvidia, nNV, 0, 0);
    }
    initOK+= gDev.nDev;

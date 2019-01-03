@@ -28,6 +28,11 @@ Bool32 validBuff (const MemBuff *pB, size_t b)
    return(pB && pB->p && (pB->bytes >= b));
 } // validBuff
 
+void releaseMemBuff (MemBuff *pB)
+{
+   if (pB && pB->p) { free(pB->p); pB->p= NULL; }
+} // releaseMemBuff
+
 size_t fileSize (const char * const path)
 {
    if (path && path[0])

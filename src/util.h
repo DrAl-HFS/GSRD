@@ -88,6 +88,7 @@ typedef struct { U16 start, len; } ScanSeg;
 /***/
 
 extern Bool32 validBuff (const MemBuff *pB, size_t b);
+extern void releaseMemBuff (MemBuff *pB);
 
 extern const char *stripPath (const char *path);
 

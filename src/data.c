@@ -171,6 +171,11 @@ MapSite *genMapPeriodic (MapData *pMD, const V2U32 *pDef)
    return(NULL);
 } // genMapPeriodic
 
+void releaseMap (MapData *pMD)
+{
+   if (pMD && pMD->pM) { free(pMD->pM); pMD->pM= NULL; }
+} // releaseMap
+
 //size_t paramBytes (U16 w, U16 h) { return(MAX(w,h) * 3 * sizeof(Scalar)); }
 Scalar validateKL (Scalar kR[3], const Scalar kL[3])
 {
@@ -330,33 +335,36 @@ void releaseHBT (HostBuffTab * const pT)
    if (pT->pC) { free(pT->pC); pT->pC= NULL; }
 } // releaseHBT
 
-typedef Bool32 (*ShapeFunc)(F32,F32,F32);
+typedef Bool32 (*ShapeFunc)(F32,F32,F32,F32);
 
-static Bool32 sfr (F32 dx, F32 dy, F32 r)
+static Bool32 sfr (F32 dx, F32 dy, F32 rx, F32 ry)
 {
-   return((fabs(dx) <= r) && (fabs(dy) <= r));
+   return((fabs(dx) <= rx) && (fabs(dy) <= ry));
 } // sfr
 
-static Bool32 sfc (F32 dx, F32 dy, F32 r)
+static Bool32 sfc (F32 dx, F32 dy, F32 rx, F32 ry)
 {
-   return((dx*dx + dy*dy) <= (r*r));
+   if (0 != ry) { dy*= rx / ry; }
+   return((dx*dx + dy*dy) <= (rx*rx));
 } // sfc
 
-size_t genBlob (HostFB * const pB, const ImgOrg * const pO, const V2F32 *pC, const F32 r, RandF *pR, ShapeFunc f)
+int setAB (HostFB * const pB, const ImgOrg * const pO, const I32 ix, const I32 iy, RandF *pRF)
 {
-   size_t i, j, nB= 0;
-   V2U32 m= { pC->x+r+1, pC->y+r+1 };
-   for (I32 iy= pC->y-r; iy <= m.y; iy++)
+   size_t i= ix * pO->stride[0] + iy * pO->stride[1];
+   size_t j= i + pO->stride[3];
+   pB->pAB[i]= 0.5; pB->pAB[j]= 0.25 + randF(pRF); 
+   return(1);
+} // setAB
+
+size_t genBlob (HostFB * const pB, const ImgOrg * const pO, const V2F32 *pC, const V2F32 *pR, RandF *pRF, ShapeFunc f)
+{
+   size_t nB= 0;
+   V2U32 m= { pC->x+pR->x+1, pC->y+pR->y+1 };
+   for (I32 iy= pC->y-pR->y; iy <= m.y; iy++)
    { 
-      for (I32 ix= pC->x-r; ix <= m.x; ix++)
+      for (I32 ix= pC->x-pR->x; ix <= m.x; ix++)
       {
-         if (f(ix-pC->x, iy-pC->y, r))
-         {
-            i= ix * pO->stride[0] + iy * pO->stride[1];
-            j= i + pO->stride[3];
-            pB->pAB[i]= 0.5; pB->pAB[j]= 0.25 + randF(pR); 
-            nB++;
-         }
+         if (f(ix-pC->x, iy-pC->y, pR->x, pR->y)) { nB+= setAB(pB,pO,ix,iy,pRF); }
       }
    }
    return(nB);
@@ -367,16 +375,24 @@ typedef struct
    V2U16 i, s;
 } RectLat;
 
-void genRectLat (RectLat *pL, const V2U32 *pDef, U8 border, U32 n)
+void genRectLat (RectLat *pL, const V2U32 *pDef, U8 border, const V2U32 *pN)
 {
-   if (n > 1)
+   if (pN && (pN->x > 0) || (pN->y > 0))
    {
       const V2U32 sub= {pDef->x - 2 * border, pDef->y - 2 * border};
+      U32 n= MAX(pN->x, pN->y);
+#if 0
+      pL->s.x= sub.x / (1 + MAX(1, pN->x));
+      pL->i.x= border + pL->s.x;
+      pL->s.y= sub.y / (1 + MAX(1, pN->y));
+      pL->i.y= border + pL->s.y;
+#else
       F32 dA= ((F32) sub.x * sub.y) / n;
       F32 dW= 0.5 * sqrt(dA);
       pL->s.x= pL->s.y= MAX(2,dW);
       pL->i.x= border + (pL->s.x + (sub.x % pL->s.x)) / 2;
       pL->i.y= border + (pL->s.y + (sub.y % pL->s.y)) / 2;
+#endif
    }
    else
    {
@@ -386,13 +402,19 @@ void genRectLat (RectLat *pL, const V2U32 *pDef, U8 border, U32 n)
    }
 } // genRectLat
 
+F32 constrainSize (F32 s, F32 minD)
+{
+   if (s <= 0) { s= minD / 32; } else if (s < 1.0) { s= s * minD; }
+   return MAX(1,s);
+} // constrainSize
+
 size_t initHFB (HostFB * const pB, const ImgOrg * const pO, const PatternInfo *pPI)
 {
    size_t i, j, nB= 0;
    int x, y;
    RandF rf={{0,0},};
    ShapeFunc pSF= NULL;
-   const I32 minD= MIN(pO->def.x, pO->def.y);
+   const F32 minD= MIN(pO->def.x, pO->def.y);
    RectLat rl;
 
    memset(pB->pAB, 0, pO->n * sizeof(*(pB->pAB)));
@@ -404,8 +426,8 @@ size_t initHFB (HostFB * const pB, const ImgOrg * const pO, const PatternInfo *p
          pB->pAB[i]= 0.4 + 0.2 * (1 & (x ^ y));
       }
    }
-printf("PI= %u %s %G\n", pPI->n, pPI->id, pPI->s);
-   if (charInSet('R', pPI->id+1)) { initRF(&rf, 0.25, -0.125, 54321); }
+   //printf("PI= %u %s %G\n", pPI->n, pPI->id, pPI->s);
+   if (charInSet('R', pPI->id+1)) { initRF(&rf, 1.0/2, -1.0/4, 54321); }
    switch ( pPI->id[0] )
    {
       case 'C' :
@@ -422,24 +444,25 @@ printf("PI= %u %s %G\n", pPI->n, pPI->id, pPI->s);
          break;
    }
 
-   genRectLat(&rl, &(pO->def), 2, pPI->n);
+   V2U32 d={ pPI->n[0], pPI->n[1] };
+   genRectLat(&rl, &(pO->def), 2, &d);
    printf("rl: %d %d   %d %d\n", rl.i.x, rl.i.y, rl.s.x, rl.s.y);
    if (pSF)
    {
-      F32 r= MAX(1,pPI->s);
+      V2F32 r;
       
-      if (0 == pPI->s) { r= minD / 32; }
-      else if (pPI->s < 1.0) { r= pPI->s * minD; }
+      r.x= constrainSize(pPI->s[0], minD);
+      if (pPI->s[1] < 0) { r.y= r.x; } else { r.y= constrainSize(pPI->s[1], minD); } 
       for (y= rl.i.y; y < pO->def.y; y+= rl.s.y)
       { 
          for (x= rl.i.x; x < pO->def.x; x+= rl.s.x)
          {
             V2F32 c= { x, y };
-            printf("c: %f %f\n", c.x, c.y);
-            nB+= genBlob(pB, pO, &c, r, &rf, pSF);
+            printf("blob: %f %f %f %f\n", c.x, c.y, r.x, r.y);
+            nB+= genBlob(pB, pO, &c, &r, &rf, pSF);
          }
       }
-      printf("genGlob() - %zu\n", nB);
+      printf("sum blobs = %zu\n", nB);
    }
    else
    {
@@ -447,10 +470,7 @@ printf("PI= %u %s %G\n", pPI->n, pPI->id, pPI->s);
       { 
          for (x= rl.i.x; x < pO->def.x; x+= rl.s.x)
          {
-            i= x * pO->stride[0] + y * pO->stride[1];
-            j= i + pO->stride[3];
-            pB->pAB[i]= 0.5; pB->pAB[j]= 0.25 + randF(&rf);
-            nB++;
+            nB+= setAB(pB,pO,x,y,&rf); 
          }
       }
    }

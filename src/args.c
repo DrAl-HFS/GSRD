@@ -159,14 +159,21 @@ void addOutPath (ArgInfo *pAI, const char *pCh, const U8 u)
 
 I32 scanPattern (PatternInfo *pPI, const char s[])
 {
-   I32 n, i= 0;
-   if (isdigit(s[i]))
+   I32 m, n, i= 0;
+   m= 0;
+   do
    {
-      size_t v=0;
-      n= scanZD(&v, s+i);
-      if ((n > 0) && (v < ((size_t)1 << 32))) { pPI->n= v; }
-      i+= n;
-   }
+      i+= charInSet(s[i],",;: ");
+      if (isdigit(s[i]))
+      {
+         size_t v=0;
+         n= scanZD(&v, s+i);
+         if ((n > 0) && (v < ((size_t)1 << 32)) && (m < 2)) { pPI->n[m++]= v; }
+         i+= n;
+      }
+   } while (charInSet(s[i],",;: "));
+   while (m < 2) { pPI->n[m++]= 0; } 
+   //i+= charInSet(s[i],",;: ");
    if (isalpha(s[i]))
    {
       char c= toupper(s[i]);
@@ -191,12 +198,19 @@ I32 scanPattern (PatternInfo *pPI, const char s[])
             break;
       }
    }
-   if (isdigit(s[i]))
+   m= 0;
+   do
    {
-      char *pE;
-      pPI->s= strtof(s+i, &pE);
-      if (pE) { i= pE - s; }
-   }
+      i+= charInSet(s[i],",;: ");
+      if (isdigit(s[i]))
+      {
+         char *pE;
+         float f= strtof(s+i, &pE);
+         if (pE) { i= pE - s; }
+         if (m < 2) { pPI->s[m++]= f; }
+      }
+   } while (charInSet(s[i],",;: "));
+   while (m < 2) { pPI->s[m++]= -1; } 
    return(i);
 } // scanPattern
 

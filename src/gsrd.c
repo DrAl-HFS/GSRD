@@ -72,9 +72,10 @@ void releaseCtx (Context * const pC)
    {
       releaseParam(&(pC->pv));
       releaseHBT(&(pC->hbt));
-      if (pC->map.pM) { free(pC->map.pM); } //releaseMap();
-      if (pC->ws.p) { free(pC->ws.p); }
-      memset(pC, 0, sizeof(*pC));
+      releaseMap(&(pC->map));
+      releaseMemBuff(&(pC->ws));
+      //memset(pC, 0, sizeof(*pC));
+      printf("releaseCtx() - resources freed\n");
    }
 } // releaseCtx
 
@@ -321,13 +322,14 @@ void postProc (const ArgInfo *pAI)
          I32 n= genOutPath1(path, m, pRP, pAI->files.outName, i);
          n+= snprintf(path+n, m-n, "(%lu,%lu,2)F64.raw", gCtx.org.def.x, gCtx.org.def.y);
 
-         printf("postProc() - %s\n", path);
+         //printf("postProc() - %s\n", path);
          if (scanDFI(&dfi, path) && loadFrame(pFrame, &dfi))
          {
             saveFrame(pFrame, &(gCtx.org), pAI, &imgMap, USAGE_XFER);
          }
          i+= pAI->proc.subIter;
       } while (i <= pAI->proc.maxIter);
+      printf("postProc() - complete\n");
    }
 } // postProc
 
@@ -484,7 +486,7 @@ int main ( int argc, char* argv[] )
       postProc(&ai);
    }
    releaseCtx(&gCtx);
- 
+
    if (nCmp > 0)
    {
       if (0 != nErr) { printf( "Test FAILED\n"); }

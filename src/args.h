@@ -57,8 +57,8 @@ typedef struct
 typedef struct
 {
    char  id[4];
-   U32   n;
-   F32   s;
+   U32   n[2];
+   F32   s[2];
 } PatternInfo;
 
 typedef struct

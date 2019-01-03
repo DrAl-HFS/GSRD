@@ -139,8 +139,9 @@ typedef struct
 // void initWrap (BoundaryWrap *pW, const Stride stride[4]);
 extern void initOrg (ImgOrg * const pO, const U16 w, const U16 h, const U8 flags);
 
-MapSite *genMapReflective (MapData *pMD, const V2U32 *pDef);
-MapSite *genMapPeriodic (MapData *pMD, const V2U32 *pDef);
+extern MapSite *genMapReflective (MapData *pMD, const V2U32 *pDef);
+extern MapSite *genMapPeriodic (MapData *pMD, const V2U32 *pDef);
+extern void releaseMap (MapData *pMD);
 
 extern size_t initParam
 (
