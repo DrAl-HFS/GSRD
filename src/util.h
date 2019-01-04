@@ -1,6 +1,6 @@
 // util.h - Gray-Scott Reaction-Diffusion using OpenACC
 // https://github.com/DrAl-HFS/GSRD.git
-// (c) GSRD Project Contributors Feb-October 2018
+// (c) GSRD Project Contributors Feb 2018 - Jan 2019
 
 #ifndef UTIL_H
 #define UTIL_H

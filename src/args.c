@@ -298,6 +298,11 @@ int scanArgs (ArgInfo *pAI, const char * const a[], int nA)
                ++nV;
                break;
 
+            case 'N' :
+               pAI->files.outName= pCh+n;
+               ++nV;
+               break;
+
             case 'X' :
                pAI->files.flags|= FLAG_FILE_XFER;
                addOutPath(pAI, pCh+n, USAGE_XFER);
@@ -352,8 +357,9 @@ static char *strtab[]=
    "-C:<path>        Comparison file path",
    "-D:w,h           Define dimensions of simulation domain",
    "-I:<max>,<sub>   Iterations max is total run duration, sub is periodic analysis/save interval",
-   "-L:<path>        LUT (colour map) for rgb output",
+   "-L:<path>        LUT (colour map) applied during rgb conversion of output",
    "-M ?struct_file? Enable Map processing of spatial structure; requires reflective boundary",
+   "-N:<prefix>      Name prefix for output files (instead of gsrd..)",
    "-O:<path>        Output file path and inferred type (raw or rgb)",
    "-P:#[P|S|C][R]#  Initial Pattern # number of Point, Square or Circle with optional Randomised biomass of size #",
    "-R               Interleave (versus planar) scalar fields",
