@@ -237,10 +237,10 @@ size_t initParam
    rrd.kRR= reactSafeLim(kV, &rs);
 
    //if (pRRD->kRR > rrd.kRR) { printf("WARNING: initParam() - reaction rate %G exceeds safe (diffusion defined) limit %G\n", pRRD->kRR, rrd.kRR); }
-   pP->base.kRR= rrd.kRR;
-   pP->base.kRA= rrd.kRA;
-   pP->base.kDB= rrd.kDB;
-   printf("Rate Parameters Committed: %G %G %G\n", rrd.kRR, rrd.kRA, rrd.kDB);
+   pP->base.kRR= 1; //rrd.kRR;
+   pP->base.kRA= rrd.kRA;// * rrd.kRR;
+   pP->base.kDB= rrd.kDB;// * rrd.kRR;
+   printf("Rate Parameters Committed: %G %G %G\n", pP->base.kRR, pP->base.kRA, pP->base.kDB);
 
    pP->var.pK= NULL;
    if (pSV)

@@ -8,7 +8,7 @@
 #include "util.h"
 
 
-#define PROC_FLAG_ACCHOST  (1<<0)
+#define PROC_FLAG_ACCMCORE (1<<0)
 #define PROC_FLAG_ACCGPU   (1<<1)
 
 

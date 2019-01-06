@@ -550,7 +550,7 @@ extern void acc_free(void*); */
 
 Bool32 procInitAcc (size_t f) // arg param ?
 {
-   int initOK= (0 == (f & (PROC_FLAG_ACCGPU|PROC_FLAG_ACCHOST)));
+   int initOK= (0 == (f & (PROC_FLAG_ACCGPU|PROC_FLAG_ACCMCORE)));
    int nNV= acc_get_num_devices( acc_device_nvidia );
    int nH= acc_get_num_devices( acc_device_host );
    int nNH= acc_get_num_devices( acc_device_not_host );
@@ -559,14 +559,14 @@ Bool32 procInitAcc (size_t f) // arg param ?
    printf("procInitAcc() - nH=%d nNV=%d, (other=%d)\n", nH, nNV, nNH - nNV);
    gDev.nDev= 0;
    gDev.iHost= -1;
-   if ((nH > 0) && (f & PROC_FLAG_ACCHOST))
+   if ((nH > 0) && (f & PROC_FLAG_ACCMCORE))
    {
       I32 v[2]=0;
       scanEnvID(v+0, 1, "ACC_NUM_CORES");
       scanEnvID(v+1, 1, "OMP_NUM_THREADS");
       id= acc_get_device_num(acc_device_host);
 //acc_get_device_processors(id);???
-      printf("\tH: C%d T%d id=%d\n", v[0], v[1], id);
+      printf("\tMC: C%d T%d id=%d\n", v[0], v[1], id);
       addDevType(&gDev, acc_device_host, nH, v[0], v[1]);
       gDev.iHost= 0;
    }
@@ -594,7 +594,7 @@ const char *procGetCurrAccTxt (char t[], int m)
    switch (pA->c)
    {
       case acc_device_nvidia : s= "NV"; break;
-      case acc_device_host :   s= "H"; break;
+      case acc_device_host :   s= "MC"; break;
       default : s= "?"; break;
    }
 #endif // ACC

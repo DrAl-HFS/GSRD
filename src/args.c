@@ -236,10 +236,10 @@ int scanArgs (ArgInfo *pAI, const char * const a[], int nA)
          {
             case 'A' :
                v= toupper( pCh[n] );
-               if ('H' == v) { pAI->proc.flags|= PROC_FLAG_ACCHOST; }
+               if ('M' == v) { pAI->proc.flags|= PROC_FLAG_ACCMCORE; }
                if ('G' == v) { pAI->proc.flags|= PROC_FLAG_ACCGPU; }
-               if ('A' == v) { pAI->proc.flags|= PROC_FLAG_ACCHOST|PROC_FLAG_ACCGPU; }
-               if ('N' == v) { pAI->proc.flags&= ~(PROC_FLAG_ACCHOST|PROC_FLAG_ACCGPU); }
+               if ('A' == v) { pAI->proc.flags|= PROC_FLAG_ACCMCORE|PROC_FLAG_ACCGPU; }
+               if ('N' == v) { pAI->proc.flags&= ~(PROC_FLAG_ACCMCORE|PROC_FLAG_ACCGPU); }
                ++nV;
                break;
 
@@ -352,7 +352,7 @@ void usage (void)
 {
 static char *strtab[]=
 {
-   "-A:[H|G|A|N]     Acceleration: Host GPU All None",
+   "-A:[M|G|A|N]     Acceleration: Multicore GPU All None",
    "-B:[R|P]         Boundary: Reflective Periodic",
    "-C:<path>        Comparison file path",
    "-D:w,h           Define dimensions of simulation domain",

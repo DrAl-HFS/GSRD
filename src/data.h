@@ -96,7 +96,7 @@ typedef struct
    Scalar      *pAB;
    BlockStat   s;
    size_t      iter;
-   char        label[8];
+   char        label[12];
 } HostFB;
 
 typedef struct
