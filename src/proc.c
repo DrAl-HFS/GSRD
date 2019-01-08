@@ -187,10 +187,14 @@ INLINE void proc2D8S9P (Scalar * const pR, const Scalar * const pS, const Index 
 } // proc2D8S9P
 
 // Wrapper function for proc2D8S9P() that determines wrap values for the local spatial indices using map entry
-// This automates boundary processing.
+// Current implementation restricted to reflective boundary processing.
 INLINE void proc1M8S (Scalar * const pR, const Scalar * const pS, const Index x, const Index y, const ImgOrg *pO, const BaseParamVal * const pP, const MapSite m)
 {
    Stride wrap[8];
+#if 1
+   for (int i=0; i<8; i++) { wrap[i]= ((1<<i) & m) ? pO->nhStepWrap[0][i] : 0; }
+#else
+   //for (int i=0; i<8; i++) { wrap[i]= pO->nhStepWrap[ (0 == (m & (1<<i))) ][i]; }
    wrap[0]= pO->nhStepWrap[ (0 == (m & 0x01)) ][0];
    wrap[1]= pO->nhStepWrap[ (0 == (m & 0x02)) ][1];
    wrap[2]= pO->nhStepWrap[ (0 == (m & 0x04)) ][2];
@@ -199,7 +203,7 @@ INLINE void proc1M8S (Scalar * const pR, const Scalar * const pS, const Index x,
    wrap[5]= pO->nhStepWrap[ (0 == (m & 0x20)) ][5];
    wrap[6]= pO->nhStepWrap[ (0 == (m & 0x40)) ][6];
    wrap[7]= pO->nhStepWrap[ (0 == (m & 0x80)) ][7];
-
+#endif
    proc2D8S9P(pR, pS, x * pO->stride[0] + y * pO->stride[1], pO->stride[3], wrap, pP);
 } // proc1M8S
 

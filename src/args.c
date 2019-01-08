@@ -350,7 +350,7 @@ int scanArgs (ArgInfo *pAI, const char * const a[], int nA)
 
 void usage (void)
 {
-static char *strtab[]=
+static const char *strtab[]=
 {
    "-A:[M|G|A|N]     Acceleration: Multicore GPU All None",
    "-B:[R|P]         Boundary: Reflective Periodic",
@@ -360,10 +360,10 @@ static char *strtab[]=
    "-L:<path>        LUT (colour map) applied during rgb conversion of output",
    "-M ?struct_file? Enable Map processing of spatial structure; requires reflective boundary",
    "-N:<prefix>      Name prefix for output files (instead of gsrd..)",
-   "-O:<path>        Output file path and inferred type (raw or rgb)",
+   "-O:<path>        Output file path (used to infer type: raw or rgb)",
    "-P:#[P|S|C][R]#  Initial Pattern # number of Point, Square or Circle with optional Randomised biomass of size #",
    "-R               Interleave (versus planar) scalar fields",
-   "-V:<#,#,#>       Parameter values for Death, Replenishment and Biomass Diffusion",
+   "-V:<#,#,#>       Parameter values for Death (f+k), Replenishment (f) and Biomass Diffusion (Dv)",
    "-X:<path>        Post processing (conversion) file path",
 };
    int i, m= sizeof(strtab)/sizeof(strtab[0]);
