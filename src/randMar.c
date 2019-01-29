@@ -51,3 +51,5 @@ float randF (RandF *pRF)
 {
    return(randMMWC(&(pRF->s)) * pRF->f[0] + pRF->f[1]);
 } // randF
+
+void scaleRF (RandF *pRF, float s) { pRF->f[0]*= s; pRF->f[1]*= s; }

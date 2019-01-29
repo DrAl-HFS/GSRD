@@ -5,7 +5,7 @@
 #ifndef ARGS_H
 #define ARGS_H
 
-#include "util.h"
+#include "gsrdUtil.h"
 
 
 #define PROC_FLAG_ACCMCORE (1<<0)

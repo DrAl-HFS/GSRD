@@ -19,5 +19,6 @@ extern void initSeedMMWC (SeedMMWC *pS, U16 id);
 extern double randN (RandF *pRF);
 extern void initRF (RandF *pRF, float scale, float offset, U16 sid);
 extern float randF (RandF *pRF);
+extern void scaleRF (RandF *pRF, float s);
 
 #endif // RAND_MAR_H

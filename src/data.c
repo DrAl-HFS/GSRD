@@ -417,13 +417,14 @@ size_t initHFB (HostFB * const pB, const ImgOrg * const pO, const PatternInfo *p
    const F32 minD= MIN(pO->def.x, pO->def.y);
    RectLat rl;
 
+   // Init resource chequerboard, bio zero
    memset(pB->pAB, 0, pO->n * sizeof(*(pB->pAB)));
    for (y= 0; y < pO->def.y; y++)
    { 
       for (x= 0; x < pO->def.x; x++)
       {
          i= x * pO->stride[0] + y * pO->stride[1];
-         pB->pAB[i]= 0.4 + 0.2 * (1 & (x ^ y));
+         pB->pAB[i]= 0.25 + 0.5 * (1 & (x ^ y));
       }
    }
    //printf("PI= %u %s %G\n", pPI->n, pPI->id, pPI->s);
@@ -460,6 +461,7 @@ size_t initHFB (HostFB * const pB, const ImgOrg * const pO, const PatternInfo *p
             V2F32 c= { x, y };
             printf("blob: %f %f %f %f\n", c.x, c.y, r.x, r.y);
             nB+= genBlob(pB, pO, &c, &r, &rf, pSF);
+            scaleRF(&rf, 0.25);
          }
       }
       printf("sum blobs = %zu\n", nB);
