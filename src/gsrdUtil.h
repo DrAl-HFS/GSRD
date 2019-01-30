@@ -29,8 +29,6 @@ typedef struct { U16 start, len; } ScanSeg;
 
 /***/
 
-extern U32 statGetRes1 (StatRes1 * const pR, const StatMom * const pS, const SMVal dof);
-
 extern I32 scanEnvID (I32 v[], I32 max, const char *id);
 
 extern I32 charInSet (const char c, const char set[]);
