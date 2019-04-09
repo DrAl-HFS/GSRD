@@ -79,7 +79,10 @@ typedef struct
 
 typedef struct
 {
-   size_t   flags, maxIter, subIter;
+   size_t  maxIter, subIter;
+   I16     deltaSubIter;
+   U16     deltaInterval;
+   U32     flags;
 } ProcInfo;
 
 typedef struct

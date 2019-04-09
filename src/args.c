@@ -14,11 +14,11 @@ const char *sc (const char *s, const char c, const char * const e, const I8 o)
    return(NULL);
 } // sc
 
-I32 scanZD (size_t * const pZ, const char s[])
+I32 scanZD (I64 * const pZ, const char s[])
 {
    const char *pE=NULL;
    I32 n=0;
-   long long int z= strtoll(s, (char**)&pE, 10);
+   I64 z= strtoll(s, (char**)&pE, 10);
    if (pE && (pE > s))
    {
       if (pZ) { *pZ= z; }
@@ -27,13 +27,23 @@ I32 scanZD (size_t * const pZ, const char s[])
    return(n);
 } // scanZD
 
+// Hacky...
+I32 scanZU (size_t * const pZ, const char s[]) { return scanZD((I64*)pZ, s); }
+
+I64 clampZD (I64 x, I64 min, I64 max)
+{
+   if (x < min) { return(min); }
+   else if (x > max) { return(max); }
+   else { return(x); }
+} // clampZD
+
 I32 scanRevZD (size_t * const pZ, const char s[], const I32 e)
 {
    I32 i= e;
    while ((i >= 0) && isdigit(s[i])) { --i; }
    i+= !isdigit(s[i]);
    //printf("scanRevZD() [%d]=%s\n", i, s+i);
-   if (i <= e) { return scanZD(pZ, s+i); }
+   if (i <= e) { return scanZU(pZ, s+i); }
    //else
    return(0);
 } // scanRevZD
@@ -75,7 +85,7 @@ U8 scanChZ (const char *s, char c)
       if (*s)
       {
          size_t z;
-         if ((scanZD(&z, s+1) > 0) && (z > 0) && (z <= 64)) { return((U8)z); }
+         if ((scanZU(&z, s+1) > 0) && (z > 0) && (z <= 64)) { return((U8)z); }
       }
    }
    return(0);
@@ -167,7 +177,7 @@ I32 scanPattern (PatternInfo *pPI, const char s[])
       if (isdigit(s[i]))
       {
          size_t v=0;
-         n= scanZD(&v, s+i);
+         n= scanZU(&v, s+i);
          if ((n > 0) && (v < ((size_t)1 << 32)) && (m < 2)) { pPI->n[m++]= v; }
          i+= n;
       }
@@ -281,9 +291,19 @@ int scanArgs (ArgInfo *pAI, const char * const a[], int nA)
                break;
 
             case 'I' :
-               n+= scanZD(&(pAI->proc.maxIter), pCh+n);
+               n+= scanZU(&(pAI->proc.maxIter), pCh+n);
                n+= contigCharSetN(pCh+n, 2, ",;:", 3);
-               n+= scanZD(&(pAI->proc.subIter), pCh+n);
+               n+= scanZU(&(pAI->proc.subIter), pCh+n);
+               if (0 != pCh[n])
+               {
+                  I64 d;
+                  n+= contigCharSetN(pCh+n, 2, ",;:", 3);
+                  n+= scanZD(&d, pCh+n);
+                  pAI->proc.deltaSubIter= clampZD(d, -(pAI->proc.subIter-1), pAI->proc.subIter-1);
+                  n+= contigCharSetN(pCh+n, 2, ",;:", 3);
+                  n+= scanZD(&d, pCh+n);
+                  if (d <= 0) { pAI->proc.deltaInterval= 0; } else { pAI->proc.deltaInterval= MIN(d, 1000); }
+               }
                ++nV;
                break;
 

@@ -37,11 +37,13 @@
 // Terse type names
 typedef signed char  I8;
 typedef signed short I16;
-typedef signed long  I32;
+typedef signed int   I32;
+typedef signed long  I64; // PGI & GCC x64 long->64bits
 
 typedef unsigned char  U8;
 typedef unsigned short U16;
-typedef unsigned long  U32;
+typedef unsigned int   U32;
+typedef unsigned long  U64;
 
 typedef float F32;
 typedef double F64;

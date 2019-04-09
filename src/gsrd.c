@@ -2,6 +2,7 @@
 // https://github.com/DrAl-HFS/GSRD.git
 // (c) GSRD Project Contributors Feb-April 2018
 
+#include "gsrd.h"
 #include "args.h"
 #include "proc.h"
 #include "image.h"
@@ -12,7 +13,7 @@ typedef struct
    HostBuffTab hbt;
    ImgOrg      org;
    MapData     map;
-   size_t      iter, baseIter;
+   size_t     iter, baseIter;
    MemBuff     ws;
 } Context;
 
@@ -412,7 +413,7 @@ int main ( int argc, char* argv[] )
    {
       n= scanArgs(&ai, (const char **)(argv+1), argc-1);
       if (0 == n) { return(0); }
-      printf("n=%d proc: f=0x%zX, m=%zu, s=%zu\n", ai.proc.flags, ai.proc.maxIter, ai.proc.subIter);
+      printf("proc: max=%zu, sub=%zu delta=%d/%u, flags=0x%X\n", ai.proc.maxIter, ai.proc.subIter, ai.proc.deltaSubIter, ai.proc.deltaInterval, ai.proc.flags);
    }
    procTest();
 
@@ -427,7 +428,8 @@ int main ( int argc, char* argv[] )
 
       do
       {
-         size_t iM= pPI->maxIter;
+         I64 iM= pPI->maxIter;
+         I32 iDS= pPI->deltaInterval;
          tE0= tE1= 0;
          if (pPI->subIter > 0) { iM= pPI->subIter; }
          afb&= 0x3;
@@ -453,11 +455,17 @@ int main ( int argc, char* argv[] )
             tE0= deltaT();
             tE1+= tE0;
             
+            if ((0 != pPI->deltaSubIter) && (--iDS <= 0))
+            {
+               iM+= pPI->deltaSubIter;
+               if (iM <= 0) { iM= 1; }
+               iDS= pPI->deltaInterval;
+            }
             k= (gCtx.iter - pFrame->iter) & 0x1;
             pFrame[k].iter= gCtx.iter;
 
             summarise(pFrame+k, &(gCtx.hbt.sg), &(gCtx.org));
-            printf("\ttE= %G, %G\n", tE0, tE1);
+            printf("%d\t%G\t%G\n", iM, tE0, tE1);
 
             saveFrame(pFrame+k, &(gCtx.org), &ai, NULL, USAGE_PERIODIC);
          } while ((i > 0) && (gCtx.iter < pPI->maxIter));

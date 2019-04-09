@@ -12,6 +12,7 @@
 /***/
 
 // Initialise state for host/gpu acc devices determined by flags arguement
+// Flags defined in "args.h"
 extern Bool32 procInitAcc (size_t f);
 // Get a text label for current acc device
 extern const char *procGetCurrAccTxt (char t[], int m);
