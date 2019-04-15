@@ -30,13 +30,6 @@ I32 scanZD (I64 * const pZ, const char s[])
 // Hacky...
 I32 scanZU (size_t * const pZ, const char s[]) { return scanZD((I64*)pZ, s); }
 
-I64 clampZD (I64 x, I64 min, I64 max)
-{
-   if (x < min) { return(min); }
-   else if (x > max) { return(max); }
-   else { return(x); }
-} // clampZD
-
 I32 scanRevZD (size_t * const pZ, const char s[], const I32 e)
 {
    I32 i= e;
@@ -294,16 +287,19 @@ int scanArgs (ArgInfo *pAI, const char * const a[], int nA)
                n+= scanZU(&(pAI->proc.maxIter), pCh+n);
                n+= contigCharSetN(pCh+n, 2, ",;:", 3);
                n+= scanZU(&(pAI->proc.subIter), pCh+n);
+#ifdef DEBUG
                if (0 != pCh[n])
                {
-                  I64 d;
+                  I64 d, t;
                   n+= contigCharSetN(pCh+n, 2, ",;:", 3);
                   n+= scanZD(&d, pCh+n);
-                  pAI->proc.deltaSubIter= clampZD(d, -(pAI->proc.subIter-1), pAI->proc.subIter-1);
+                  t= pAI->proc.subIter - (0 != pAI->proc.subIter);
+                  pAI->proc.deltaSubIter= (I32)clampI64(d, -t, pAI->proc.maxIter - pAI->proc.subIter);
                   n+= contigCharSetN(pCh+n, 2, ",;:", 3);
                   n+= scanZD(&d, pCh+n);
-                  if (d <= 0) { pAI->proc.deltaInterval= 0; } else { pAI->proc.deltaInterval= MIN(d, 1000); }
+                  if (d <= 0) { pAI->proc.deltaInterval= 0; } else { pAI->proc.deltaInterval= (U32)MIN(d, 1000); }
                }
+#endif
                ++nV;
                break;
 

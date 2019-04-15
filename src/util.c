@@ -98,6 +98,13 @@ U32 statGetRes1 (StatRes1 * const pR, const StatMom * const pS, const SMVal dof)
    return(o);
 } // statGetRes1
 
+I64 clampI64 (I64 x, I64 min, I64 max)
+{
+   if (x < min) { return(min); }
+   else if (x > max) { return(max); }
+   else { return(x); }
+} // clampI64
+
 
 #ifdef UTIL_TEST
 

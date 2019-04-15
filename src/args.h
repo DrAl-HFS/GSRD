@@ -10,6 +10,9 @@
 
 #define PROC_FLAG_ACCMCORE (1<<0)
 #define PROC_FLAG_ACCGPU   (1<<1)
+#define PROC_FLAG_OUTFRAMES (1<<8)
+#define PROC_FLAG_SUMMARISE (1<<9)
+#define PROC_FLAG_COMPARE   (1<<10)
 
 
 #define DFI_FLAG_VALIDATED (1<<0)
@@ -80,9 +83,11 @@ typedef struct
 typedef struct
 {
    size_t  maxIter, subIter;
-   I16     deltaSubIter;
-   U16     deltaInterval;
-   U32     flags;
+#ifdef DEBUG
+   I32     deltaSubIter;
+   U32     deltaInterval;
+#endif
+   size_t  flags;
 } ProcInfo;
 
 typedef struct

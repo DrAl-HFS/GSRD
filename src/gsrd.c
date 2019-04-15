@@ -413,9 +413,14 @@ int main ( int argc, char* argv[] )
    {
       n= scanArgs(&ai, (const char **)(argv+1), argc-1);
       if (0 == n) { return(0); }
-      printf("proc: max=%zu, sub=%zu delta=%d/%u, flags=0x%X\n", ai.proc.maxIter, ai.proc.subIter, ai.proc.deltaSubIter, ai.proc.deltaInterval, ai.proc.flags);
+      printf("proc: max=%zu, sub=%zu flags=0x%X\n", ai.proc.maxIter, ai.proc.subIter, ai.proc.flags);
+#ifdef DEBUG
+      printf("\tsubDelta=%d/%u\n", ai.proc.deltaSubIter, ai.proc.deltaInterval);
+#endif
    }
+#ifdef DEBUG
    procTest();
+#endif
 
    const DataFileInfo * const pIF= &(ai.files.init);
    const InitInfo * const pII= &(ai.init);
@@ -447,51 +452,53 @@ int main ( int argc, char* argv[] )
          memcpy(pFrame[1].label, pFrame[0].label, sizeof(pFrame->label));
          do
          {
-            size_t iR= pPI->maxIter - gCtx.iter;
-            if (iM > iR) { iM= iR; }
-
+            iM= clampI64(iM, 1, pPI->maxIter - gCtx.iter);
             deltaT();
             gCtx.iter+= i= procNI(pFrame[(k^0x1)].pAB, pFrame[k].pAB, &(gCtx.org), &(gCtx.pv), iM, &(gCtx.map));
             tE0= deltaT();
             tE1+= tE0;
             
-            if ((0 != pPI->deltaSubIter) && (--iDS <= 0))
-            {
-               iM+= pPI->deltaSubIter;
-               if (iM <= 0) { iM= 1; }
-               iDS= pPI->deltaInterval;
-            }
             k= (gCtx.iter - pFrame->iter) & 0x1;
             pFrame[k].iter= gCtx.iter;
 
-            summarise(pFrame+k, &(gCtx.hbt.sg), &(gCtx.org));
-            printf("%d\t%G\t%G\n", iM, tE0, tE1);
+            if (pPI->flags & PROC_FLAG_SUMMARISE) { summarise(pFrame+k, &(gCtx.hbt.sg), &(gCtx.org)); }
+            fprintf(stderr,"%zu\t%d\t%G\t%G\n", gCtx.iter, iM, tE0, tE1);
 
-            saveFrame(pFrame+k, &(gCtx.org), &ai, NULL, USAGE_PERIODIC);
+            if (pPI->flags & PROC_FLAG_OUTFRAMES) { saveFrame(pFrame+k, &(gCtx.org), &ai, NULL, USAGE_PERIODIC); }
+#ifdef DEBUG
+            if ((0 != pPI->deltaSubIter) && (--iDS <= 0))
+            {
+               iM+= pPI->deltaSubIter;
+               iDS= pPI->deltaInterval;
+            }
+#endif
          } while ((i > 0) && (gCtx.iter < pPI->maxIter));
          fprintf(stderr,"%s\t%zu\t%zu\t%G\n", pFrame->label, pPI->maxIter, pPI->subIter, tE1);
          if (nIdx < 4) { fIdx[nIdx++]= afb+k; }
          afb+= 2;
       } while (procSetNextAcc(PROC_NOWRAP));
-      if (nIdx > 1)
+      if (pPI->flags & PROC_FLAG_COMPARE)
       {
-         pF2= gCtx.hbt.hfb+fIdx[1];
-         pFrame=  gCtx.hbt.hfb+fIdx[0];
-         //if (pFrame->iter == pF1->iter) 
-         { nCmp++; nErr= compare(pFrame, pF2, &(gCtx.org), 1.0/(1<<30)); }
-      }
-      if ((nIdx > 0) && (nIdx < 4))
-      {
-         fIdx[nIdx]= ( fIdx[nIdx-1] + 1 ) & 0x3;
-         pF2= gCtx.hbt.hfb + fIdx[nIdx];
-         if (loadFrame( pF2, &(ai.files.cmp) ))
+         if (nIdx > 1)
          {
-            snprintf(pF2->label, sizeof(pF2->label)-1, "CF");
-            nCmp++;
-            nErr= compare(pFrame, pF2, &(gCtx.org), 1.0/(1<<10));
+            pF2= gCtx.hbt.hfb+fIdx[1];
+            pFrame=  gCtx.hbt.hfb+fIdx[0];
+            //if (pFrame->iter == pF1->iter) 
+            { nCmp++; nErr= compare(pFrame, pF2, &(gCtx.org), 1.0/(1<<30)); }
+         }
+         if ((nIdx > 0) && (nIdx < 4))
+         {
+            fIdx[nIdx]= ( fIdx[nIdx-1] + 1 ) & 0x3;
+            pF2= gCtx.hbt.hfb + fIdx[nIdx];
+            if (loadFrame( pF2, &(ai.files.cmp) ))
+            {
+               snprintf(pF2->label, sizeof(pF2->label)-1, "CF");
+               nCmp++;
+               nErr= compare(pFrame, pF2, &(gCtx.org), 1.0/(1<<10));
+            }
          }
       }
-      postProc(&ai);
+      if (pPI->flags & PROC_FLAG_OUTFRAMES) { postProc(&ai); }
    }
    releaseCtx(&gCtx);
 

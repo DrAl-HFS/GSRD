@@ -83,4 +83,6 @@ extern SMVal deltaT (void);
 
 extern U32 statGetRes1 (StatRes1 * const pR, const StatMom * const pS, const SMVal dof);
 
+extern I64 clampI64 (I64 x, I64 min, I64 max);
+
 #endif // UTIL_H
