@@ -41,10 +41,10 @@ static I32 validLUT (const F32 *pF, const I32 nF, const MinMaxI32 *pMM)
    if (pF && (nF >= m))
    {
       int r= nF / m;
-      if ((m > 4) || (r > (1<<12))) { printf("WARNING: validLUT() %d*%d\n", m, r); }
+      if ((m > 4) || (r > (1<<12))) { report(WRN4,"validLUT() %d*%d\n", m, r); }
       if (nF == (r * pMM->min))
       {
-         printf("validLUT() %d*%d=%d OK\n", m, r, nF);
+         report(VRB1,"validLUT() %d*%d=%d OK\n", m, r, nF);
          return(r);
       }
    }
@@ -53,7 +53,7 @@ static I32 validLUT (const F32 *pF, const I32 nF, const MinMaxI32 *pMM)
 
 static void clean (signed char *pS, size_t n)
 {
-   while (pS[n] < ' ') { printf("[%zu] 0x%02X\n", n, 0xFF & pS[n]); --n; }
+   while (pS[n] < ' ') { report(VRB1,"[%zu] 0x%02X\n", n, 0xFF & pS[n]); --n; }
 } // clean
 
 I32 findLH (F32 v, const ImageLUT *pL)
@@ -117,7 +117,7 @@ int imageLoadLUT (const MemBuff *pB, const char path[])
          pF= pB->p;
 
          s= skipPastSet(pS, "\r\n"); // HACKY skip header line
-         //printf("imageLoadLUT() %s %p %zu %s\n", path, pS, b, pS+s);
+         //report(VRB1,"imageLoadLUT() %s %p %zu %s\n", path, pS, b, pS+s);
          m= MIN(256 * 4, m); // prevent overrun crash
          n= scanTableF32(pF, m, &mm, pS+s, &s, b-s);
          r= validLUT(pF,n,&mm);
@@ -139,11 +139,11 @@ int imageLoadLUT (const MemBuff *pB, const char path[])
                   I32 j= i * mm.min;
                   pL->pT[i]= pF[j+0];
                   pL->pRGBX[i]= packRGB8(pF[j+1], pF[j+2], pF[j+3]);
-                  //printf("%G %u %u %u\n", pL->pT[i], pL->pRGBX[i].r, pL->pRGBX[i].g, pL->pRGBX[i].b);
+                  //report(VRB1,"%G %u %u %u\n", pL->pT[i], pL->pRGBX[i].r, pL->pRGBX[i].g, pL->pRGBX[i].b);
                }
                {
                   F32 l= linearityF32(pL->pT, pL->n);
-                  if (l < 1) { printf("\tWARNING: linearityF32() = %G\n", l); }
+                  if (l < 1) { report(WRN4,"linearityF32() -> %G\n", l); }
                }
             }
             //pL->lh[0].r= 0; pL->lh[0].g= 0; pL->lh[0].b= 0x08; pL->lh[0].x= 0xFF;
@@ -151,7 +151,7 @@ int imageLoadLUT (const MemBuff *pB, const char path[])
             return(r);
          }
       }
-      printf("imageLoadLUT() %zu %d,%d\n", b, n, r);
+      report(VRB1,"imageLoadLUT() %zu %d,%d\n", b, n, r);
    }
    return(0);
 } // imageLoadLUT
@@ -194,7 +194,7 @@ size_t imageTransferRGB (U8 *pRGB, const Scalar * const pAB, const ImgOrg * cons
    if (pL)
    {
       //size_t out[3]= {0,0,0};
-      printf("imageTransferRGB() %G,%G -> %G,%G\n", dom[0], dom[1], dom[0] * map[0] + map[1], dom[1] * map[0] + map[1]);
+      report(VRB1,"imageTransferRGB() %G,%G -> %G,%G\n", dom[0], dom[1], dom[0] * map[0] + map[1], dom[1] * map[0] + map[1]);
       m= pL->n - 1;
       for (y= 0; y < pO->def.y; y++)
       {
@@ -215,7 +215,7 @@ size_t imageTransferRGB (U8 *pRGB, const Scalar * const pAB, const ImgOrg * cons
             pRGB[k++]= pT->b;
          }
       }
-      //printf("out[]=%zu %zu %zu\n", out[0], out[1], out[2]);
+      //report(VRB1,"out[]=%zu %zu %zu\n", out[0], out[1], out[2]);
    }
    else
    {

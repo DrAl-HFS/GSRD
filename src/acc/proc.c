@@ -1,6 +1,6 @@
 // proc.c - Gray-Scott Reaction-Diffusion using OpenACC
 // https://github.com/DrAl-HFS/GSRD.git
-// (c) GSRD Project Contributors Feb-October 2018
+// (c) GSRD Project Contributors Feb 2018 - April 2019
 
 #include "proc.h"
 
@@ -487,11 +487,11 @@ U32 hackMD
             aD[j].d[i].upd.n*= pO->stride[1];
          }
 
-         printf("[%u] %u:%u\n", j, aD[j].dev.t, aD[j].dev.n); pD= aD[j].d; // dump
-         printf("   mm \t%u,%u; %u,%u\n", pD[0].mm.min, pD[0].mm.max, pD[1].mm.min, pD[1].mm.max);
-         printf("   in \t%u,%u; %u,%u\n", pD[0].in.o, pD[0].in.n, pD[1].in.o, pD[1].in.n);
-         printf("   out\t%u,%u; %u,%u\n", pD[0].out.o, pD[0].out.n, pD[1].out.o, pD[1].out.n);
-         printf("   upd\t%u,%u; %u,%u\n", pD[0].upd.o, pD[0].out.n, pD[1].out.o, pD[1].out.n);
+         report(VRB1,"[%u] %u:%u\n", j, aD[j].dev.t, aD[j].dev.n); pD= aD[j].d; // dump
+         report(VRB1,"   mm \t%u,%u; %u,%u\n", pD[0].mm.min, pD[0].mm.max, pD[1].mm.min, pD[1].mm.max);
+         report(VRB1,"   in \t%u,%u; %u,%u\n", pD[0].in.o, pD[0].in.n, pD[1].in.o, pD[1].in.n);
+         report(VRB1,"   out\t%u,%u; %u,%u\n", pD[0].out.o, pD[0].out.n, pD[1].out.o, pD[1].out.n);
+         report(VRB1,"   upd\t%u,%u; %u,%u\n", pD[0].upd.o, pD[0].out.n, pD[1].out.o, pD[1].out.n);
       }
       if (nD > 1)
       {
@@ -561,7 +561,7 @@ Bool32 procInitAcc (const size_t f) // arg param ?
    int nNH= acc_get_num_devices( acc_device_not_host );
    int id;
 
-   printf("procInitAcc() - nH=%d nNV=%d, (other=%d)\n", nH, nNV, nNH - nNV);
+   report(VRB1,"procInitAcc() - nH=%d nNV=%d, (other=%d)\n", nH, nNV, nNH - nNV);
    gDev.nDev= 0;
    gDev.iHost= -1;
    if ((nH > 0) && (f & PROC_FLAG_ACCMCORE))
@@ -571,14 +571,14 @@ Bool32 procInitAcc (const size_t f) // arg param ?
       scanEnvID(v+1, 1, "OMP_NUM_THREADS");
       id= acc_get_device_num(acc_device_host);
 //acc_get_device_processors(id);???
-      printf("\tMC: C%d T%d id=%d\n", v[0], v[1], id);
+      report(VRB1,"\tMC: C%d T%d id=%d\n", v[0], v[1], id);
       addDevType(&gDev, acc_device_host, nH, v[0], v[1]);
       gDev.iHost= 0;
    }
    if ((nNV > 0) && (f & PROC_FLAG_ACCGPU))
    {
       id= acc_get_device_num(acc_device_nvidia);
-      printf("\tNV:id=%d\n", id);
+      report(VRB1,"\tNV:id=%d\n", id);
       addDevType(&gDev, acc_device_nvidia, nNV, 0, 0);
    }
    initOK+= gDev.nDev;
@@ -587,7 +587,7 @@ Bool32 procInitAcc (const size_t f) // arg param ?
       gDev.iCurr= 0;
       acc_set_device_num( gDev.d[0].n, gDev.d[0].c );
    }
-   printf("procInitAcc(0x%x) - %d\n", f, initOK);
+   report(VRB1,"procInitAcc(0x%x) - %d\n", f, initOK);
    return(initOK > 0);
 } // procInitAcc
 
@@ -664,15 +664,15 @@ void procTest (void)
 {
 #ifndef NOMP
    int i, n= omp_get_max_threads();
-   printf("procTest(%d)-\n", n);
+   report(VRB1,"procTest(%d)-\n", n);
    //n= MIN(2,n);
    #pragma omp parallel num_threads(n)
    {
       n= omp_get_num_threads();
       i= omp_get_thread_num();
-      printf("Hello %d / %d\n", i, n);
+      report(VRB1,"Hello %d / %d\n", i, n);
    }
-   printf("-procTest()\n");
+   report(VRB1,"-procTest()\n");
 #endif // NOMP
 } // procTest
 

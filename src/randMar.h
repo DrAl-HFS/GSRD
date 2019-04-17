@@ -1,11 +1,12 @@
 // randMar.h - Gray-Scott Reaction-Diffusion using OpenACC
 // https://github.com/DrAl-HFS/GSRD.git
-// (c) GSRD Project Contributors Feb-October 2018
+// (c) GSRD Project Contributors Feb 2018 - April 2019
 
 #ifndef RAND_MAR_H
 #define RAND_MAR_H
 
 #include "util.h"
+#include "report.h"
 
 
 // Marsaglia MWC PRNG

@@ -7,6 +7,7 @@
 
 #include "args.h"
 #include "randMar.h"
+#include "report.h"
 
 #define KR0  (Scalar)0.125
 #define KRA0 (Scalar)0.0115

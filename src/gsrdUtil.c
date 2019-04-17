@@ -87,7 +87,7 @@ I32 scanNF32 (F32 v[], const I32 maxV, const char str[], I32 *pNS, const char sk
             nS+= s;
          }
       } while ((nV < maxV) && (s > 0) && str[nS] && !charInSet(str[nS], end));
-      //printf("scanNF32() %p %d\n", v, nV);
+      //report(VRB1,"scanNF32() %p %d\n", v, nV);
       if (pNS) { *pNS= nS; }
    }
    return(nV);
@@ -107,7 +107,7 @@ I32 scanTableF32 (F32 v[], I32 maxV, MinMaxI32 *pW, const char str[], I32 *pNS, 
       {
          s= skipPastSet(str+nS,"\r\n");
          if (s > 0) { nS+= s; }
-         //if (++i >= 255) { printf("scanTableF32() %d [%d]=%s\n", i, maxS-nS, str+nS); }
+         //if (++i >= 255) { report(VRB1,"scanTableF32() %d [%d]=%s\n", i, maxS-nS, str+nS); }
          if (nS < maxS)
          {
             n= scanNF32(v+nV, maxV-nV, str+nS, &s, ",", "\r\n");
@@ -120,7 +120,7 @@ I32 scanTableF32 (F32 v[], I32 maxV, MinMaxI32 *pW, const char str[], I32 *pNS, 
             }
          }
       } 
-      //printf("scanTableF32() [%d] %G .. %G : %d*(%d,%d) %d\n", nV, v[0], v[nV-1], i, w.min, w.max, maxS-nS);
+      //report(VRB1,"scanTableF32() [%d] %G .. %G : %d*(%d,%d) %d\n", nV, v[0], v[nV-1], i, w.min, w.max, maxS-nS);
       if (pNS) { *pNS= nS; }
       if (pW) { *pW= w; }
    }

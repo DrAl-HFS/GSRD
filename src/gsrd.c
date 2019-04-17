@@ -1,11 +1,12 @@
 // gsrd.c - Gray-Scott Reaction-Diffusion using OpenACC
 // https://github.com/DrAl-HFS/GSRD.git
-// (c) GSRD Project Contributors Feb-April 2018
+// (c) GSRD Project Contributors Feb 2018 - April 2019
 
 #include "gsrd.h"
 #include "args.h"
 #include "proc.h"
 #include "image.h"
+#include "report.h"
 
 typedef struct
 {
@@ -76,7 +77,7 @@ void releaseCtx (Context * const pC)
       releaseMap(&(pC->map));
       releaseMemBuff(&(pC->ws));
       //memset(pC, 0, sizeof(*pC));
-      printf("releaseCtx() - resources freed\n");
+      report(VRB1, "releaseCtx() - resources freed\n");
    }
 } // releaseCtx
 
@@ -156,9 +157,9 @@ size_t saveFrame
             {
                case ID_FILE_RAW : r= saveRaw(pF,path,m,n,pO); break;
                case ID_FILE_RGB : r= saveRGB(pF,path,m,n,pO,pM); break;
-               default : printf("saveFrame() - id=%u??\n", id);
+               default : report(WRN4, "saveFrame() - id=%u??\n", id);
             }
-            printf("saveFrame() - %s %p %zu bytes\n", path, pF->pAB, r);
+            report(VRB1, "saveFrame() - %s %p %zu bytes\n", path, pF->pAB, r);
          }
       } while (++i < pA->files.nOutPath);
    }
@@ -204,7 +205,7 @@ void summarise (HostFB * const pF, StatG * const pSG, const ImgOrg * const pO)
 
    frameStat(&(pF->s), pSG, pF->pAB, pO);
 
-   printf("summarise() - \n\t%zu  N min max sum mean var\n", pF->iter);
+   report(OUT0, "summarise() - \n\t%zu  N min max sum mean var\n", pF->iter);
    fmt.pFtr= "\n"; fmt.pSep= " | <=0 ";
    fmt.limPer.min= 5000; fmt.limPer.max= n; fmt.sPer= 100.0 / n;
    fmt.pHdr= "\tA: "; 
@@ -216,13 +217,13 @@ void summarise (HostFB * const pF, StatG * const pSG, const ImgOrg * const pO)
 size_t findQHZ (double *pF, const size_t h[], const size_t nH, const size_t q)
 {
    size_t i= 0, t= h[0];
-   while ((i < nH) && (t < q)) { t+= h[++i]; } //printf("%zu ", t); }
+   while ((i < nH) && (t < q)) { t+= h[++i]; } //report(VRB1, "%zu ", t); }
    if (pF)
    {
       double f= 0.0;
       if ((i < nH) && (h[i] > 0))
       {
-         //printf("findQHZ() %zu %zu %zu\n", q, t, h[i]);
+         //report(VRB1, "findQHZ() %zu %zu %zu\n", q, t, h[i]);
          f= (double)(q - (t - h[i])) / h[i];
       }
       *pF= f + i;
@@ -279,12 +280,12 @@ void reportSG (MinMaxF64 *pT, const F64 q, const StatG * const pSG)
          t= i + findTailHZ(pSG->hB.pH+i, pSG->hB.nH-i, 2, 3);
          f= t;
          pT->max= f * pSG->rMap[0] + pSG->rMap[1];
-         printf("Tail [%zu]=%zu %G\n\n", t, pSG->hB.pH[t], pT->max);
+         printf( "Tail [%zu]=%zu %G\n\n", t, pSG->hB.pH[t], pT->max);
 #if 0
          {  // TODO: check for anomalies...
             size_t a= MAX(0, t-10);
             size_t b= MIN(pSG->hB.nH-1, t+10);
-            for (i=a; i <= b; i++) { printf("[%zu]= %zu\n", i, pSG->hB.pH[i] ); }
+            for (i=a; i <= b; i++) { report(OUT0, "[%zu]= %zu\n", i, pSG->hB.pH[i] ); }
             printf("\n");
          }
 #endif
@@ -323,14 +324,14 @@ void postProc (const ArgInfo *pAI)
          I32 n= genOutPath1(path, m, pRP, pAI->files.outName, i);
          n+= snprintf(path+n, m-n, "(%lu,%lu,2)F64.raw", gCtx.org.def.x, gCtx.org.def.y);
 
-         //printf("postProc() - %s\n", path);
+         //report(VRB1, "postProc() - %s\n", path);
          if (scanDFI(&dfi, path) && loadFrame(pFrame, &dfi))
          {
             saveFrame(pFrame, &(gCtx.org), pAI, &imgMap, USAGE_XFER);
          }
-         i+= pAI->proc.subIter;
-      } while (i <= pAI->proc.maxIter);
-      printf("postProc() - complete\n");
+         i+= pAI->proc.iter.sub;
+      } while (i <= pAI->proc.iter.max);
+      report(VRB1, "postProc() - complete\n");
    }
 } // postProc
 
@@ -404,6 +405,22 @@ const V2U16 *selectDef (const DataFileInfo * const pIF, const InitInfo * const p
    return(NULL);
 } // selectDef
 
+void initIS (IterState *pIS, const IterCtrl *pIC)
+{
+   if (pIC->sub > 0) { pIS->iM= pIC->sub; } else { pIS->iM= pIC->max; }
+   pIS->iB= pIC->batch + (pIC->batch > 0);
+} // initIS
+
+void updateIS (IterState *pIS, const IterCtrl *pIC, const size_t i)
+{
+   if ((pIS->iB >= 0) && (--(pIS->iB) <= 0))
+   {
+      pIS->iM+= pIC->delta;
+      pIS->iB= pIC->batch;// + (pIC->batch > 0);
+   }
+   pIS->iM= clampI64(pIS->iM, 2, pIC->max - i);
+} // updateIS
+
 int main ( int argc, char* argv[] )
 {
    int n= 0, i= 0, nCmp=0, nErr= 0;
@@ -413,11 +430,10 @@ int main ( int argc, char* argv[] )
    {
       n= scanArgs(&ai, (const char **)(argv+1), argc-1);
       if (0 == n) { return(0); }
-      printf("proc: max=%zu, sub=%zu flags=0x%X\n", ai.proc.maxIter, ai.proc.subIter, ai.proc.flags);
-#ifdef DEBUG
-      printf("\tsubDelta=%d/%u\n", ai.proc.deltaSubIter, ai.proc.deltaInterval);
-#endif
+      report(VRB1, "proc: max=%zu, sub=%zu flags=0x%X\n", ai.proc.iter.max, ai.proc.iter.sub, ai.proc.flags);
+      report(VRB1, "\tsubDelta=%d/%u\n", ai.proc.iter.delta, ai.proc.iter.batch);
    }
+   reportN(0,argv,argc,"# "," ","\n");
 #ifdef DEBUG
    procTest();
 #endif
@@ -427,19 +443,20 @@ int main ( int argc, char* argv[] )
    const ProcInfo * const pPI= &(ai.proc);
    if (procInitAcc(pPI->flags) && initCtx(&gCtx, selectDef(pIF, pII), 8, &ai))
    {
+      IterState iter;
       SMVal tE0, tE1;
       HostFB *pFrame, *pF2=NULL;
       U8 afb=0, nIdx=0, fIdx[4], k=0;
 
       do
       {
-         I64 iM= pPI->maxIter;
-         I32 iDS= pPI->deltaInterval;
+         initIS(&iter, &(pPI->iter));
+         
          tE0= tE1= 0;
-         if (pPI->subIter > 0) { iM= pPI->subIter; }
+         
          afb&= 0x3;
          pFrame= gCtx.hbt.hfb + afb;
-         if (0 == loadFrame(pFrame, pIF))  //printf("nB=%zu\n",
+         if (0 == loadFrame(pFrame, pIF))  //report(VRB1, "nB=%zu\n",
          {
             initHFB(pFrame, &(gCtx.org), &(pII->pattern));
             saveFrame(pFrame, &(gCtx.org), &ai, NULL, USAGE_INITIAL);
@@ -448,35 +465,35 @@ int main ( int argc, char* argv[] )
          //k= (gCtx.iter - pFrame->iter) & 0x1;
          // if verbose...
          summarise(pFrame, NULL, &(gCtx.org)); // ignore initial dist. &(gCtx.hbt.sg)
-         printf("---- %s ----\n", procGetCurrAccTxt(pFrame->label, sizeof(pFrame->label)-1));
+         report(OUT0, "---- %s ----\n", procGetCurrAccTxt(pFrame->label, sizeof(pFrame->label)-1));
          memcpy(pFrame[1].label, pFrame[0].label, sizeof(pFrame->label));
          do
          {
-            iM= clampI64(iM, 1, pPI->maxIter - gCtx.iter);
+            updateIS(&iter, &(pPI->iter), gCtx.iter);
             deltaT();
-            gCtx.iter+= i= procNI(pFrame[(k^0x1)].pAB, pFrame[k].pAB, &(gCtx.org), &(gCtx.pv), iM, &(gCtx.map));
+            gCtx.iter+= i= procNI(pFrame[(k^0x1)].pAB, pFrame[k].pAB, &(gCtx.org), &(gCtx.pv), iter.iM, &(gCtx.map));
             tE0= deltaT();
             tE1+= tE0;
-            
+
             k= (gCtx.iter - pFrame->iter) & 0x1;
             pFrame[k].iter= gCtx.iter;
 
             if (pPI->flags & PROC_FLAG_SUMMARISE) { summarise(pFrame+k, &(gCtx.hbt.sg), &(gCtx.org)); }
-            fprintf(stderr,"%zu\t%d\t%G\t%G\n", gCtx.iter, iM, tE0, tE1);
 
             if (pPI->flags & PROC_FLAG_OUTFRAMES) { saveFrame(pFrame+k, &(gCtx.org), &ai, NULL, USAGE_PERIODIC); }
-#ifdef DEBUG
-            if ((0 != pPI->deltaSubIter) && (--iDS <= 0))
-            {
-               iM+= pPI->deltaSubIter;
-               iDS= pPI->deltaInterval;
-            }
-#endif
-         } while ((i > 0) && (gCtx.iter < pPI->maxIter));
-         fprintf(stderr,"%s\t%zu\t%zu\t%G\n", pFrame->label, pPI->maxIter, pPI->subIter, tE1);
+            report(OUT0,"%zu\t%d\t%G\t%G\n", gCtx.iter, iter.iM, tE0, tE1);
+         } while ((i > 0) && (gCtx.iter < pPI->iter.max));
+
+         {
+            char s[16]="*";
+            if (pPI->iter.sub == iter.iM) { snprintf(s, sizeof(s)-1, "%zu", pPI->iter.sub); }
+            report(OUT0,"%s\t%zu\t%s\t%G\n", pFrame->label, gCtx.iter - gCtx.baseIter, s, tE1);
+         }
+
          if (nIdx < 4) { fIdx[nIdx++]= afb+k; }
          afb+= 2;
       } while (procSetNextAcc(PROC_NOWRAP));
+      //
       if (pPI->flags & PROC_FLAG_COMPARE)
       {
          if (nIdx > 1)
@@ -504,8 +521,8 @@ int main ( int argc, char* argv[] )
 
    if (nCmp > 0)
    {
-      if (0 != nErr) { printf( "Test FAILED\n"); }
-      else {printf( "Test PASSED\n"); }
-   } else { printf("Complete\n"); }
+      if (0 != nErr) { report(VRB1, "Test FAILED\n"); }
+      else {report(VRB1, "Test PASSED\n"); }
+   } else { report(VRB1, "Complete\n"); }
    return(0);
 } // main

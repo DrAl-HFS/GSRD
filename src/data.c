@@ -1,6 +1,6 @@
 // data.c - Gray-Scott Reaction-Diffusion using OpenACC
 // https://github.com/DrAl-HFS/GSRD.git
-// (c) GSRD Project Contributors Feb-April 2018
+// (c) GSRD Project Contributors Feb 2018 - April 2019
 
 #include "data.h"
 
@@ -14,7 +14,7 @@ static const InitSpatVarParam gISVP[]={0.100, 0.005};
 //deprecate
 static void initWrap (BoundaryWrap *pW, const Stride stride[4])
 {
-   pW->h[0]= stride[1]; pW->h[1]= stride[2] - stride[1];	// 0..3 LO, 2..5 HI
+   pW->h[0]= stride[1]; pW->h[1]= stride[2] - stride[1]; // 0..3 LO, 2..5 HI
    pW->h[2]= -stride[0]; pW->h[3]= stride[0];
    pW->h[4]= stride[1] - stride[2]; pW->h[5]= -stride[1];
 } // initWrap
@@ -104,7 +104,7 @@ void genMap (MapSite *pM, const U8 *pS, const V2U32 *pDef, const U8 k)
 /*
 size_t z= 0;
 for (size_t i= 0; i<n; i++) { z+= (0 == pM[i]); }
-printf("genTestMap() - z=%zu\n", z);
+report(VRB1,"genTestMap() - z=%zu\n", z);
 */
 } // genMap
 
@@ -230,17 +230,17 @@ size_t initParam
    }
  
    // Set diffusion weights
-   printf("initParam() - kL:e=%.f\n", validateKL(kV, kL));
+   report(VRB1,"initParam() - kL:e=%.f\n", validateKL(kV, kL));
    for ( i= 0; i<3; ++i ) { pP->base.kL.a[i]= kV[i] * rs.rLA; pP->base.kL.b[i]= kV[i] * rs.rLB; }
-   printf("Laplacian Parameters Committed: %G %G\n", rs.rLA, rs.rLB);
+   report(VRB1,"Laplacian Parameters Committed: %G %G\n", rs.rLA, rs.rLB);
    // reaction rates
    rrd.kRR= reactSafeLim(kV, &rs);
 
-   //if (pRRD->kRR > rrd.kRR) { printf("WARNING: initParam() - reaction rate %G exceeds safe (diffusion defined) limit %G\n", pRRD->kRR, rrd.kRR); }
+   //if (pRRD->kRR > rrd.kRR) { report(WRN1,"initParam() - reaction rate %G exceeds safe (diffusion defined) limit %G\n", pRRD->kRR, rrd.kRR); }
    pP->base.kRR= 1; //rrd.kRR;
    pP->base.kRA= rrd.kRA;// * rrd.kRR;
    pP->base.kDB= rrd.kDB;// * rrd.kRR;
-   printf("Rate Parameters Committed: %G %G %G\n", pP->base.kRR, pP->base.kRA, pP->base.kDB);
+   report(VRB1,"Rate Parameters Committed: %G %G %G\n", pP->base.kRR, pP->base.kRA, pP->base.kDB);
 
    pP->var.pK= NULL;
    if (pSV)
@@ -287,8 +287,8 @@ Bool32 initHBT (HostBuffTab * const pT, const size_t fb, const U32 mF, const U32
    memset(pT, 0, sizeof(*pT));
    if (mF & 1)
    { 
-	   pT->pC= malloc(fb / 2);
-	   nF+= (NULL != pT->pC);
+      pT->pC= malloc(fb / 2);
+      nF+= (NULL != pT->pC);
    }
    do
    {
@@ -427,7 +427,7 @@ size_t initHFB (HostFB * const pB, const ImgOrg * const pO, const PatternInfo *p
          pB->pAB[i]= 0.25 + 0.5 * (1 & (x ^ y));
       }
    }
-   //printf("PI= %u %s %G\n", pPI->n, pPI->id, pPI->s);
+   //report(VRB1,"PI= %u %s %G\n", pPI->n, pPI->id, pPI->s);
    if (charInSet('R', pPI->id+1)) { initRF(&rf, 1.0/2, -1.0/4, 54321); }
    switch ( pPI->id[0] )
    {
@@ -441,13 +441,13 @@ size_t initHFB (HostFB * const pB, const ImgOrg * const pO, const PatternInfo *p
       case 'P' :
          break;
       default:
-         printf("initHFB() - shape %s???", pPI->id);
+         report(WRN4,"initHFB() - shape %s???", pPI->id);
          break;
    }
 
    V2U32 d={ pPI->n[0], pPI->n[1] };
    genRectLat(&rl, &(pO->def), 2, &d);
-   printf("rl: %d %d   %d %d\n", rl.i.x, rl.i.y, rl.s.x, rl.s.y);
+   report(VRB1,"rl: %d %d   %d %d\n", rl.i.x, rl.i.y, rl.s.x, rl.s.y);
    if (pSF)
    {
       V2F32 r;
@@ -459,12 +459,12 @@ size_t initHFB (HostFB * const pB, const ImgOrg * const pO, const PatternInfo *p
          for (x= rl.i.x; x < pO->def.x; x+= rl.s.x)
          {
             V2F32 c= { x, y };
-            printf("blob: %f %f %f %f\n", c.x, c.y, r.x, r.y);
+            report(VRB1,"blob: %f %f %f %f\n", c.x, c.y, r.x, r.y);
             nB+= genBlob(pB, pO, &c, &r, &rf, pSF);
             scaleRF(&rf, 0.25);
          }
       }
-      printf("sum blobs = %zu\n", nB);
+      report(VRB1,"sum blobs = %zu\n", nB);
    }
    else
    {

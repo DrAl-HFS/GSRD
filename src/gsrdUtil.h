@@ -6,6 +6,7 @@
 #define GSRD_UTIL_H
 
 #include "util.h"
+#include "report.h"
 
 
 

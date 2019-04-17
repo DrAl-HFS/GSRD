@@ -1,3 +1,6 @@
+// args.c - Gray-Scott Reaction-Diffusion using OpenACC
+// https://github.com/DrAl-HFS/GSRD.git
+// (c) GSRD Project Contributors  Feb 2018 - April 2019
 
 #include "args.h"
 
@@ -35,7 +38,7 @@ I32 scanRevZD (size_t * const pZ, const char s[], const I32 e)
    I32 i= e;
    while ((i >= 0) && isdigit(s[i])) { --i; }
    i+= !isdigit(s[i]);
-   //printf("scanRevZD() [%d]=%s\n", i, s+i);
+   //report(VRB1,"scanRevZD() [%d]=%s\n", i, s+i);
    if (i <= e) { return scanZU(pZ, s+i); }
    //else
    return(0);
@@ -104,15 +107,15 @@ size_t scanDFI (DataFileInfo * pDFI, const char * const path)
       if (pDFI->nV > 0)
       {
          size_t bits= pDFI->elemBits;
-         printf("%s -> v[%d]=(", name, pDFI->nV);
+         report(VRB1,"%s -> v[%d]=(", name, pDFI->nV);
          for (int i=0; i < pDFI->nV; i++)
          {
             bits*= pDFI->v[i];
-            printf("%d,", pDFI->v[i]);
+            report(VRB1,"%d,", pDFI->v[i]);
          }
-         printf(")*%u ", pDFI->elemBits);
-         if (pDFI->bytes == ((bits+7) >> 3)) { pDFI->flags|= DFI_FLAG_VALIDATED; printf("OK\n"); }
-         if (0 == (pDFI->flags & DFI_FLAG_VALIDATED)) { printf("WARNING: scanDFI() %zuBytes in file, expected %zubits\n", pDFI->bytes, bits); }
+         report(VRB1,")*%u ", pDFI->elemBits);
+         if (pDFI->bytes == ((bits+7) >> 3)) { pDFI->flags|= DFI_FLAG_VALIDATED; report(VRB1,"OK\n"); }
+         if (0 == (pDFI->flags & DFI_FLAG_VALIDATED)) { report(WRN4,"scanDFI() - %zuBytes in file, expected %zubits\n", pDFI->bytes, bits); }
       }
    }
    return(bytes);
@@ -155,7 +158,7 @@ void addOutPath (ArgInfo *pAI, const char *pCh, const U8 u)
          pAI->files.outPath[i]= pCh;
          pAI->files.outType[i]= u & USAGE_MASK;
          if (1 == findNSubStrCaseless(id, pCh, tok, 2)) { pAI->files.outType[i]|= ID_MASK & (ID_FILE_RAW+id[0]); }
-         printf("addOutPath() - %s type:%d\n", pAI->files.outPath[i], pAI->files.outType[i]);
+         report(VRB1, "addOutPath() - %s type:%d\n", pAI->files.outPath[i], pAI->files.outType[i]);
       }
    }
 } // addOutPath
@@ -197,7 +200,7 @@ I32 scanPattern (PatternInfo *pPI, const char s[])
             i+= n;
             break;
          default :
-            printf("scanPattern() - %s???\n", s+i);
+            report(WRN4,"scanPattern() - %s???\n", s+i);
             break;
       }
    }
@@ -223,7 +226,7 @@ int scanArgs (ArgInfo *pAI, const char * const a[], int nA)
    ArgInfo tmpAI;
    int nV= 0, nHE= (nA <= 1);
 
-   //if (nA > 0) { printf("scanArgs() - %s\n", a[0]); }
+   //if (nA > 0) { report(VRB1,"scanArgs() - %s\n", a[0]); }
    if (NULL == pAI) { pAI= &tmpAI; }
    while (nA-- > 0)
    {
@@ -253,8 +256,10 @@ int scanArgs (ArgInfo *pAI, const char * const a[], int nA)
                ++nV;
                break;
 
-            case 'C' : nV+= ( scanDFI(&(pAI->files.cmp), pCh+n) > 0 );
-               //printf("cmp:iter=%zu\n", pAI->files.cmp.iter);
+            case 'C' :
+               pAI->proc.flags|= PROC_FLAG_COMPARE;
+               nV+= ( scanDFI(&(pAI->files.cmp), pCh+n) > 0 );
+               //report(VRB1,"cmp:iter=%zu\n", pAI->files.cmp.iter);
                break;
 
             case 'D' :
@@ -278,28 +283,27 @@ int scanArgs (ArgInfo *pAI, const char * const a[], int nA)
                      }
                      pAI->init.nD= 2;
                   }
-                  //printf("DEF:%s -> %d, %u %u\n", pCh+n, l, pAI->init.def.x, pAI->init.def.y);
+                  //report(VRB1,"DEF:%s -> %d, %u %u\n", pCh+n, l, pAI->init.def.x, pAI->init.def.y);
                }
                ++nV;
                break;
 
             case 'I' :
-               n+= scanZU(&(pAI->proc.maxIter), pCh+n);
+               n+= scanZU(&(pAI->proc.iter.max), pCh+n);
                n+= contigCharSetN(pCh+n, 2, ",;:", 3);
-               n+= scanZU(&(pAI->proc.subIter), pCh+n);
-#ifdef DEBUG
+               n+= scanZU(&(pAI->proc.iter.sub), pCh+n);
+               if (pAI->proc.iter.sub > pAI->proc.iter.max) SWAP(size_t, pAI->proc.iter.sub, pAI->proc.iter.max);
                if (0 != pCh[n])
                {
                   I64 d, t;
                   n+= contigCharSetN(pCh+n, 2, ",;:", 3);
                   n+= scanZD(&d, pCh+n);
-                  t= pAI->proc.subIter - (0 != pAI->proc.subIter);
-                  pAI->proc.deltaSubIter= (I32)clampI64(d, -t, pAI->proc.maxIter - pAI->proc.subIter);
+                  t= pAI->proc.iter.sub - (0 != pAI->proc.iter.sub);
+                  pAI->proc.iter.delta= (I32)clampI64(d, -t, pAI->proc.iter.max - pAI->proc.iter.sub);
                   n+= contigCharSetN(pCh+n, 2, ",;:", 3);
                   n+= scanZD(&d, pCh+n);
-                  if (d <= 0) { pAI->proc.deltaInterval= 0; } else { pAI->proc.deltaInterval= (U32)MIN(d, 1000); }
+                  if (d <= 0) { pAI->proc.iter.batch= 0; } else { pAI->proc.iter.batch= (U32)MIN(d, 1000); }
                }
-#endif
                ++nV;
                break;
 
@@ -320,12 +324,14 @@ int scanArgs (ArgInfo *pAI, const char * const a[], int nA)
                break;
 
             case 'X' :
+               pAI->proc.flags|= PROC_FLAG_OUTFRAMES;
                pAI->files.flags|= FLAG_FILE_XFER;
                addOutPath(pAI, pCh+n, USAGE_XFER);
                ++nV;
                break;
 
             case 'O' :
+               pAI->proc.flags|= PROC_FLAG_OUTFRAMES;
                pAI->files.flags|= FLAG_FILE_OUT;
                addOutPath(pAI, pCh+n, USAGE_INITIAL|USAGE_PERIODIC|USAGE_FINAL);
                ++nV;
@@ -349,7 +355,7 @@ int scanArgs (ArgInfo *pAI, const char * const a[], int nA)
                ++nV;
                break;
 
-            default : printf("scanArgs() - unknown flag -%c\n", c);
+            default : report(WRN4,"scanArgs() - unknown flag -%c\n", c);
 
             case 'H' :
             case '?' : nHE++;
@@ -358,9 +364,8 @@ int scanArgs (ArgInfo *pAI, const char * const a[], int nA)
    }
    if (nHE > 0) { usage(); }
    //if (0 == pAI->proc.flags) { pAI->proc.flags= PROC_FLAG_HOST|PROC_FLAG_GPU; }
-   if (0 == pAI->proc.maxIter) { pAI->proc.maxIter= 5000; }
-   if (0 == pAI->proc.subIter) { pAI->proc.subIter= 1000; }
-   if (pAI->proc.subIter > pAI->proc.maxIter) SWAP(size_t, pAI->proc.subIter, pAI->proc.maxIter);
+   if (0 == pAI->proc.iter.max) { pAI->proc.iter.max= 5000; }
+   if (0 == pAI->proc.iter.sub) { pAI->proc.iter.sub= 1000; }
    return(nV);
 } // scanArgs
 
@@ -383,7 +388,7 @@ static const char *strtab[]=
    "-X:<path>        Post processing (conversion) file path",
 };
    int i, m= sizeof(strtab)/sizeof(strtab[0]);
-   printf("Usage:\n");
-   for (i= 0; i < m; i++ ) { printf("\t%s\n", strtab[i]); }
-   printf("\n");
+   report(VRB1,"Usage:\n");
+   for (i= 0; i < m; i++ ) { report(VRB3,"\t%s\n", strtab[i]); }
+   report(VRB1,"\n");
 } // usage

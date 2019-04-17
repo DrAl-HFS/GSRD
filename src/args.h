@@ -1,19 +1,19 @@
 // args.h - Gray-Scott Reaction-Diffusion using OpenACC
 // https://github.com/DrAl-HFS/GSRD.git
-// (c) GSRD Project Contributors Feb-October 2018
+// (c) GSRD Project Contributors  Feb 2018 - April 2019
 
 #ifndef ARGS_H
 #define ARGS_H
 
 #include "gsrdUtil.h"
+#include "report.h"
 
 
 #define PROC_FLAG_ACCMCORE (1<<0)
 #define PROC_FLAG_ACCGPU   (1<<1)
 #define PROC_FLAG_OUTFRAMES (1<<8)
-#define PROC_FLAG_SUMMARISE (1<<9)
-#define PROC_FLAG_COMPARE   (1<<10)
-
+#define PROC_FLAG_SUMMARISE (1<<9)  // Never set...
+#define PROC_FLAG_COMPARE   (1<<10) // " "
 
 #define DFI_FLAG_VALIDATED (1<<0)
 
@@ -82,11 +82,19 @@ typedef struct
 
 typedef struct
 {
-   size_t  maxIter, subIter;
-#ifdef DEBUG
-   I32     deltaSubIter;
-   U32     deltaInterval;
-#endif
+   size_t max, sub;
+   U32 batch;
+   I32 delta;
+} IterCtrl;
+
+typedef struct
+{
+   I64 iM, iB;
+} IterState;
+
+typedef struct
+{
+   IterCtrl iter;
    size_t  flags;
 } ProcInfo;
 

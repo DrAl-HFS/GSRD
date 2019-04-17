@@ -19,7 +19,7 @@ double randN (RandF *pRF)
 static uint seedFromID (U16 id)
 {
    uint i,n1,n2,t= 0xC5A3;
-   //printf("getseed()\n");
+   //report(VRB1,"getseed()\n");
    for (i=0; i<4; ++i)
    {
       n1= (id & 0x3) * 4;
@@ -29,7 +29,7 @@ static uint seedFromID (U16 id)
       t= t << (4 + n2);
       t|= ((0xAC53 >> n1) & 0xF) << n2;
       if (i & 1) { t|= (1 << n2)-1; }
-      //printf(" [%u] %u %u %u\n", i, n1, n2, t);
+      //report(VRB1," [%u] %u %u %u\n", i, n1, n2, t);
    }
    return(t);
 } // seedFromID
