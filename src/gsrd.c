@@ -416,6 +416,7 @@ void updateIS (IterState *pIS, const IterCtrl *pIC, const size_t i)
    if ((pIS->iB >= 0) && (--(pIS->iB) <= 0))
    {
       pIS->iM+= pIC->delta;
+      if (pIS->iM <= 2) { pIS->iM-= pIC->delta + 2; }
       pIS->iB= pIC->batch;// + (pIC->batch > 0);
    }
    pIS->iM= clampI64(pIS->iM, 2, pIC->max - i);
@@ -470,6 +471,7 @@ int main ( int argc, char* argv[] )
          do
          {
             updateIS(&iter, &(pPI->iter), gCtx.iter);
+            if (iter.iM >= 90) { sleep(1); } // slugging to avoid thermal clock limit
             deltaT();
             gCtx.iter+= i= procNI(pFrame[(k^0x1)].pAB, pFrame[k].pAB, &(gCtx.org), &(gCtx.pv), iter.iM, &(gCtx.map));
             tE0= deltaT();
